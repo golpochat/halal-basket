@@ -1,0 +1,23 @@
+{
+  "name": "halal-basket",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "frontend",
+    "shared"
+  ],
+  "scripts": {
+    "dev:backend": "npm run start:dev -w backend",
+    "dev:web": "npm run dev -w frontend",
+    "dev:customer": "npm run dev -w frontend",
+    "dev:shop": "npm run dev -w frontend",
+    "dev:driver": "npm run dev -w frontend",
+    "build": "npm run build -w shared && npm run build -w backend && npm run build -w frontend",
+    "db:migrate": "npm run prisma:migrate -w backend",
+    "db:seed": "npm run prisma:seed -w backend",
+    "db:generate": "npm run prisma:generate -w backend"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

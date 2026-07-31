@@ -1,0 +1,329 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  customer
+  shop
+  driver
+  admin
+  super_admin
+}
+
+enum StockStatusSource {
+  shop
+  system
+  import
+}
+
+enum FulfillmentMode {
+  pickup
+  scheduled_delivery
+  realtime_delivery
+}
+
+enum OrderStatus {
+  pending
+  confirmed
+  in_progress
+  completed
+  cancelled
+}
+
+enum FulfillmentStatus {
+  pending
+  preparing
+  ready
+  out_for_delivery
+  delivered
+  cancelled
+}
+
+enum PaymentStatus {
+  pending
+  paid
+  failed
+  refunded
+}
+
+enum OrderEventType {
+  status_change
+  refund
+  complaint
+  note
+  driver_feedback_linked
+}
+
+enum Weekday {
+  monday
+  tuesday
+  wednesday
+  thursday
+  friday
+  saturday
+  sunday
+}
+
+model User {
+  id                String    @id @default(uuid())
+  email             String    @unique
+  phone             String?   @unique
+  passwordHash      String    @map("password_hash")
+  role              UserRole
+  isActive          Boolean   @default(true) @map("is_active")
+  failedLoginCount  Int       @default(0) @map("failed_login_count")
+  lockedUntil       DateTime? @map("locked_until")
+  createdAt         DateTime  @default(now()) @map("created_at")
+
+  customer  Customer?
+  shopUsers ShopUser[]
+  driver    Driver?
+  events    OrderEvent[] @relation("EventActor")
+
+  @@map("users")
+}
+
+model Customer {
+  id          String   @id @default(uuid())
+  userId      String   @unique @map("user_id")
+  name        String
+  addressList Json     @default("[]") @map("address_list")
+  riskScore   Int      @default(0) @map("risk_score")
+  isBlocked   Boolean  @default(false) @map("is_blocked")
+
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders   Order[]
+  feedback DriverFeedback[]
+
+  @@map("customers")
+}
+
+model ShopUser {
+  id     String @id @default(uuid())
+  userId String @map("user_id")
+  shopId String @map("shop_id")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, shopId])
+  @@map("shop_users")
+}
+
+model Category {
+  id   String @id @default(uuid())
+  name String
+  slug String @unique
+
+  products Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id             String   @id @default(uuid())
+  name           String
+  slug           String   @unique
+  categoryId     String?  @map("category_id")
+  description    String?
+  imageUrl       String?  @map("image_url")
+  tags           Json     @default("[]")
+  isActive       Boolean  @default(true) @map("is_active")
+  barcode        String   @unique
+  qrCode         String   @map("qr_code")
+  qrCodeImageUrl String?  @map("qr_code_image_url")
+  sku            String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  category     Category?     @relation(fields: [categoryId], references: [id])
+  shopProducts ShopProduct[]
+  orderItems   OrderItem[]
+
+  @@map("products")
+}
+
+model Shop {
+  id              String  @id @default(uuid())
+  name            String
+  parentCompanyId String? @map("parent_company_id")
+  address         String?
+  phone           String?
+  email           String?
+  openingHours    Json    @default("{}") @map("opening_hours")
+  deliveryZones   Json    @default("[]") @map("delivery_zones")
+  lat             Float?
+  lng             Float?
+  isActive        Boolean @default(true) @map("is_active")
+
+  shopUsers        ShopUser[]
+  shopProducts     ShopProduct[]
+  fulfillments     OrderFulfillment[]
+  preferredOrders  Order[]            @relation("PreferredShop")
+
+  @@map("shops")
+}
+
+model ShopProduct {
+  id                String            @id @default(uuid())
+  shopId            String            @map("shop_id")
+  productId         String            @map("product_id")
+  price             Decimal           @db.Decimal(10, 2)
+  discountPrice     Decimal?          @map("discount_price") @db.Decimal(10, 2)
+  isInStock         Boolean           @default(true) @map("is_in_stock")
+  stockStatusSource StockStatusSource @default(shop) @map("stock_status_source")
+  lastStockUpdateAt DateTime?         @map("last_stock_update_at")
+  isVisible         Boolean           @default(true) @map("is_visible")
+
+  shop       Shop        @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  orderItems OrderItem[]
+
+  @@unique([shopId, productId])
+  @@index([shopId, isInStock, isVisible])
+  @@map("shop_products")
+}
+
+model Order {
+  id                 String          @id @default(uuid())
+  customerId         String          @map("customer_id")
+  fulfillmentMode    FulfillmentMode @map("fulfillment_mode")
+  status             OrderStatus     @default(pending)
+  totalAmount        Decimal         @map("total_amount") @db.Decimal(12, 2)
+  deliveryAddress    Json?           @map("delivery_address")
+  deliveryAreaName   String?         @map("delivery_area_name")
+  preferredShopId    String?         @map("preferred_shop_id")
+  paymentStatus      PaymentStatus   @default(pending) @map("payment_status")
+  riskScoreAtOrder   Int?            @map("risk_score_at_order")
+  createdAt          DateTime        @default(now()) @map("created_at")
+  updatedAt          DateTime        @updatedAt @map("updated_at")
+
+  customer      Customer           @relation(fields: [customerId], references: [id])
+  preferredShop Shop?              @relation("PreferredShop", fields: [preferredShopId], references: [id])
+  fulfillments  OrderFulfillment[]
+  items         OrderItem[]
+  events        OrderEvent[]
+  feedback      DriverFeedback[]
+
+  @@index([customerId, createdAt])
+  @@index([status])
+  @@map("orders")
+}
+
+model OrderFulfillment {
+  id                 String            @id @default(uuid())
+  orderId            String            @map("order_id")
+  shopId             String            @map("shop_id")
+  driverId           String?           @map("driver_id")
+  status             FulfillmentStatus @default(pending)
+  deliveryDate       DateTime?         @map("delivery_date") @db.Date
+  estimatedDeliveryAt DateTime?        @map("estimated_delivery_at")
+
+  order    Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  shop     Shop                @relation(fields: [shopId], references: [id])
+  driver   Driver?             @relation(fields: [driverId], references: [id])
+  items    OrderItem[]
+  events   OrderEvent[]
+  feedback DriverFeedback[]
+
+  @@index([driverId, deliveryDate])
+  @@index([shopId, status])
+  @@index([deliveryDate])
+  @@map("order_fulfillments")
+}
+
+model OrderItem {
+  id            String  @id @default(uuid())
+  orderId       String  @map("order_id")
+  fulfillmentId String  @map("fulfillment_id")
+  productId     String  @map("product_id")
+  shopProductId String  @map("shop_product_id")
+  quantity      Int
+  unitPrice     Decimal @map("unit_price") @db.Decimal(10, 2)
+
+  order       Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  fulfillment OrderFulfillment @relation(fields: [fulfillmentId], references: [id], onDelete: Cascade)
+  product     Product          @relation(fields: [productId], references: [id])
+  shopProduct ShopProduct      @relation(fields: [shopProductId], references: [id])
+
+  @@map("order_items")
+}
+
+model OrderEvent {
+  id            String         @id @default(uuid())
+  orderId       String         @map("order_id")
+  fulfillmentId String?        @map("fulfillment_id")
+  actorUserId   String?        @map("actor_user_id")
+  eventType     OrderEventType @map("event_type")
+  payload       Json           @default("{}")
+  createdAt     DateTime       @default(now()) @map("created_at")
+
+  order       Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  fulfillment OrderFulfillment? @relation(fields: [fulfillmentId], references: [id])
+  actor       User?             @relation("EventActor", fields: [actorUserId], references: [id])
+
+  @@map("order_events")
+}
+
+model Driver {
+  id       String  @id @default(uuid())
+  userId   String  @unique @map("user_id")
+  name     String
+  phone    String?
+  isActive Boolean @default(true) @map("is_active")
+
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fulfillments OrderFulfillment[]
+  feedback     DriverFeedback[]
+
+  @@map("drivers")
+}
+
+model DriverFeedback {
+  id            String   @id @default(uuid())
+  driverId      String   @map("driver_id")
+  customerId    String   @map("customer_id")
+  orderId       String   @map("order_id")
+  fulfillmentId String?  @map("fulfillment_id")
+  rating        Int
+  tags          Json     @default("[]")
+  suggestBlock  Boolean  @default(false) @map("suggest_block")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  driver      Driver             @relation(fields: [driverId], references: [id])
+  customer    Customer           @relation(fields: [customerId], references: [id])
+  order       Order              @relation(fields: [orderId], references: [id])
+  fulfillment OrderFulfillment?  @relation(fields: [fulfillmentId], references: [id])
+
+  @@map("driver_feedback")
+}
+
+model DeliveryCalendar {
+  id          String  @id @default(uuid())
+  areaName    String  @map("area_name")
+  deliveryDay Weekday @map("delivery_day")
+  isActive    Boolean @default(true) @map("is_active")
+
+  @@unique([areaName, deliveryDay])
+  @@index([areaName, isActive])
+  @@map("delivery_calendar")
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  actorUserId String?  @map("actor_user_id")
+  action      String
+  entityType  String   @map("entity_type")
+  entityId    String?  @map("entity_id")
+  payload     Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}

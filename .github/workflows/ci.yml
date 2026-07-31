@@ -1,0 +1,57 @@
+name: ci
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: halal
+          POSTGRES_PASSWORD: halal
+          POSTGRES_DB: halal_basket
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -Uhalal -dhalal_basket"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://halal:halal@localhost:5432/halal_basket?schema=public
+      JWT_SECRET: ci-test-secret
+      SEED_PASSWORD: HalalBasket123!
+      PAYMENT_PROVIDER: mock
+      FEATURE_REALTIME_DELIVERY: 'true'
+      FEATURE_MULTI_SHOP: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run build -w shared
+      - run: npm test -w backend
+      - run: npm run build -w backend
+      - run: npm run build -w frontend
+      - name: Migrate + seed
+        working-directory: backend
+        run: |
+          npx prisma migrate deploy
+          npx prisma db seed
+      - name: Start API
+        working-directory: backend
+        run: |
+          npm run start:prod &
+          npx --yes wait-on http://127.0.0.1:3000/health
+      - name: E2E smoke
+        working-directory: backend
+        run: npm run e2e
+      - name: npm audit (informational)
+        run: npm audit --omit=dev || true

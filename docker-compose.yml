@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: halal-basket-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: halal
+      POSTGRES_PASSWORD: halal
+      POSTGRES_DB: halal_basket
+    ports:
+      - "5433:5432"
+    volumes:
+      - halal_basket_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U halal -d halal_basket"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  halal_basket_pgdata:

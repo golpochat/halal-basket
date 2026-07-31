@@ -1,0 +1,4 @@
+name,slug,category,description,image_url,tags,is_active,barcode,sku
+Basmati Rice 5kg,basmati-rice-5kg,Rice,Premium long grain,,,true,8901001000001,SKU-RICE-5
+Chicken Thighs 1kg,chicken-thighs-1kg,Meat,Halal chicken thighs,,,true,8901001000002,SKU-CHICK-1
+Olive Oil 1L,olive-oil-1l,Pantry,Extra virgin,,,true,8901001000003,SKU-OIL-1
