@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from 'react';
 import { RequireAuth, RequireRole } from '../../auth/guards';
 import { useAuth } from '../../auth/AuthContext';
 import { AppShell } from '../../components/ui/AppShell';
+import { PasswordInput } from '../../components/ui/PasswordInput';
 import { api } from '../../lib/api';
 
 type Shop = { id: string; name: string };
@@ -14,6 +15,28 @@ type Analytics = {
     blockedCustomers: number;
     missingItemReports: number;
   };
+};
+
+type CurrencyRow = {
+  id: string;
+  code: string;
+  symbol: string;
+  name: string;
+  exchangeRate: string | number;
+  isDefault: boolean;
+  isPublished: boolean;
+  sortOrder: number;
+};
+
+type LanguageRow = {
+  id: string;
+  code: string;
+  name: string;
+  nativeName: string;
+  isRtl: boolean;
+  isDefault: boolean;
+  isPublished: boolean;
+  sortOrder: number;
 };
 
 const nav = [
@@ -37,6 +60,8 @@ function PlatformInner() {
   const [shops, setShops] = useState<Shop[]>([]);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [metrics, setMetrics] = useState<Record<string, number> | null>(null);
+  const [currencies, setCurrencies] = useState<CurrencyRow[]>([]);
+  const [languages, setLanguages] = useState<LanguageRow[]>([]);
   const [error, setError] = useState('');
   const [msg, setMsg] = useState('');
   const [email, setEmail] = useState('');
@@ -46,16 +71,28 @@ function PlatformInner() {
   const [shopId, setShopId] = useState('');
   const [shopName, setShopName] = useState('');
   const [eraseId, setEraseId] = useState('');
+  const [curCode, setCurCode] = useState('');
+  const [curSymbol, setCurSymbol] = useState('');
+  const [curName, setCurName] = useState('');
+  const [curRate, setCurRate] = useState('1');
+  const [langCode, setLangCode] = useState('');
+  const [langName, setLangName] = useState('');
+  const [langNative, setLangNative] = useState('');
+  const [langRtl, setLangRtl] = useState(false);
 
   async function refresh() {
-    const [s, a, m] = await Promise.all([
+    const [s, a, m, curs, langs] = await Promise.all([
       api<Shop[]>('/admin/shops', { token }),
       api<Analytics>('/admin/analytics/summary', { token }),
       api<Record<string, number>>('/admin/metrics', { token }),
+      api<CurrencyRow[]>('/admin/currencies', { token }),
+      api<LanguageRow[]>('/admin/languages', { token }),
     ]);
     setShops(s);
     setAnalytics(a);
     setMetrics(m);
+    setCurrencies(curs);
+    setLanguages(langs);
     if (!shopId && s[0]) setShopId(s[0].id);
   }
 
@@ -133,6 +170,60 @@ function PlatformInner() {
     }
   }
 
+  async function addCurrency(e: FormEvent) {
+    e.preventDefault();
+    setError('');
+    setMsg('');
+    try {
+      await api('/admin/currencies', {
+        method: 'POST',
+        token,
+        body: JSON.stringify({
+          code: curCode,
+          symbol: curSymbol,
+          name: curName,
+          exchangeRate: Number(curRate) || 1,
+          isPublished: false,
+        }),
+      });
+      setCurCode('');
+      setCurSymbol('');
+      setCurName('');
+      setCurRate('1');
+      setMsg('Currency added (unpublished)');
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Currency create failed');
+    }
+  }
+
+  async function addLanguage(e: FormEvent) {
+    e.preventDefault();
+    setError('');
+    setMsg('');
+    try {
+      await api('/admin/languages', {
+        method: 'POST',
+        token,
+        body: JSON.stringify({
+          code: langCode,
+          name: langName,
+          nativeName: langNative,
+          isRtl: langRtl,
+          isPublished: false,
+        }),
+      });
+      setLangCode('');
+      setLangName('');
+      setLangNative('');
+      setLangRtl(false);
+      setMsg('Language added (unpublished)');
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Language create failed');
+    }
+  }
+
   return (
     <AppShell title="Platform" nav={nav} homeTo="/super-admin">
       {error && (
@@ -175,6 +266,277 @@ function PlatformInner() {
       )}
 
       <section className="hb-surface mb-8 p-5 shadow-sm">
+        <h2 className="font-display text-xl font-semibold">Currencies</h2>
+        <p className="mt-1 text-sm text-[var(--hb-ink)]/55">
+          Default is always published. Customer currency picker appears only when
+          2+ currencies are published. Prices are stored in the default currency;
+          exchange rate is for display.
+        </p>
+        <ul className="mt-4 space-y-2">
+          {currencies.map((c) => (
+            <li
+              key={c.id}
+              className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white/70 px-3 py-2 text-sm"
+            >
+              <span>
+                <strong>
+                  {c.symbol} {c.code}
+                </strong>{' '}
+                — {c.name} · rate {Number(c.exchangeRate)}
+                {c.isDefault ? ' · default' : ''}
+                {c.isPublished ? ' · published' : ' · unpublished'}
+              </span>
+              <span className="flex flex-wrap gap-1">
+                <button
+                  type="button"
+                  className="hb-btn hb-btn-ghost px-2 py-1 text-xs"
+                  disabled={c.isDefault && c.isPublished}
+                  onClick={async () => {
+                    setError('');
+                    try {
+                      await api(`/admin/currencies/${c.id}/publish`, {
+                        method: 'PATCH',
+                        token,
+                        body: JSON.stringify({ isPublished: !c.isPublished }),
+                      });
+                      setMsg(
+                        c.isPublished
+                          ? `${c.code} unpublished`
+                          : `${c.code} published`,
+                      );
+                      await refresh();
+                    } catch (err) {
+                      setError(
+                        err instanceof Error ? err.message : 'Publish failed',
+                      );
+                    }
+                  }}
+                >
+                  {c.isPublished ? 'Unpublish' : 'Publish'}
+                </button>
+                {!c.isDefault && (
+                  <button
+                    type="button"
+                    className="hb-btn hb-btn-ghost px-2 py-1 text-xs"
+                    onClick={async () => {
+                      setError('');
+                      try {
+                        await api(`/admin/currencies/${c.id}/set-default`, {
+                          method: 'POST',
+                          token,
+                        });
+                        setMsg(`${c.code} is now default`);
+                        await refresh();
+                      } catch (err) {
+                        setError(
+                          err instanceof Error
+                            ? err.message
+                            : 'Set default failed',
+                        );
+                      }
+                    }}
+                  >
+                    Make default
+                  </button>
+                )}
+                {!c.isDefault && (
+                  <button
+                    type="button"
+                    className="hb-btn hb-btn-ghost px-2 py-1 text-xs text-red-700"
+                    onClick={async () => {
+                      setError('');
+                      try {
+                        await api(`/admin/currencies/${c.id}`, {
+                          method: 'DELETE',
+                          token,
+                        });
+                        setMsg(`${c.code} deleted`);
+                        await refresh();
+                      } catch (err) {
+                        setError(
+                          err instanceof Error ? err.message : 'Delete failed',
+                        );
+                      }
+                    }}
+                  >
+                    Delete
+                  </button>
+                )}
+              </span>
+            </li>
+          ))}
+        </ul>
+        <form onSubmit={addCurrency} className="mt-4 grid gap-2 sm:grid-cols-4">
+          <input
+            className="hb-input"
+            placeholder="Code (GBP)"
+            value={curCode}
+            onChange={(e) => setCurCode(e.target.value)}
+            required
+          />
+          <input
+            className="hb-input"
+            placeholder="Symbol (£)"
+            value={curSymbol}
+            onChange={(e) => setCurSymbol(e.target.value)}
+            required
+          />
+          <input
+            className="hb-input"
+            placeholder="Name"
+            value={curName}
+            onChange={(e) => setCurName(e.target.value)}
+            required
+          />
+          <input
+            className="hb-input"
+            placeholder="Rate vs default"
+            value={curRate}
+            onChange={(e) => setCurRate(e.target.value)}
+            required
+          />
+          <button className="hb-btn hb-btn-primary sm:col-span-4">
+            Add currency
+          </button>
+        </form>
+      </section>
+
+      <section className="hb-surface mb-8 p-5 shadow-sm">
+        <h2 className="font-display text-xl font-semibold">Languages</h2>
+        <p className="mt-1 text-sm text-[var(--hb-ink)]/55">
+          Default English stays published. Language picker shows only when 2+
+          languages are published. Full UI translation packs can be added later;
+          RTL is applied when selected.
+        </p>
+        <ul className="mt-4 space-y-2">
+          {languages.map((l) => (
+            <li
+              key={l.id}
+              className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white/70 px-3 py-2 text-sm"
+            >
+              <span>
+                <strong>{l.nativeName}</strong> ({l.name} · {l.code})
+                {l.isRtl ? ' · RTL' : ''}
+                {l.isDefault ? ' · default' : ''}
+                {l.isPublished ? ' · published' : ' · unpublished'}
+              </span>
+              <span className="flex flex-wrap gap-1">
+                <button
+                  type="button"
+                  className="hb-btn hb-btn-ghost px-2 py-1 text-xs"
+                  disabled={l.isDefault && l.isPublished}
+                  onClick={async () => {
+                    setError('');
+                    try {
+                      await api(`/admin/languages/${l.id}/publish`, {
+                        method: 'PATCH',
+                        token,
+                        body: JSON.stringify({ isPublished: !l.isPublished }),
+                      });
+                      setMsg(
+                        l.isPublished
+                          ? `${l.code} unpublished`
+                          : `${l.code} published`,
+                      );
+                      await refresh();
+                    } catch (err) {
+                      setError(
+                        err instanceof Error ? err.message : 'Publish failed',
+                      );
+                    }
+                  }}
+                >
+                  {l.isPublished ? 'Unpublish' : 'Publish'}
+                </button>
+                {!l.isDefault && (
+                  <button
+                    type="button"
+                    className="hb-btn hb-btn-ghost px-2 py-1 text-xs"
+                    onClick={async () => {
+                      setError('');
+                      try {
+                        await api(`/admin/languages/${l.id}/set-default`, {
+                          method: 'POST',
+                          token,
+                        });
+                        setMsg(`${l.code} is now default`);
+                        await refresh();
+                      } catch (err) {
+                        setError(
+                          err instanceof Error
+                            ? err.message
+                            : 'Set default failed',
+                        );
+                      }
+                    }}
+                  >
+                    Make default
+                  </button>
+                )}
+                {!l.isDefault && (
+                  <button
+                    type="button"
+                    className="hb-btn hb-btn-ghost px-2 py-1 text-xs text-red-700"
+                    onClick={async () => {
+                      setError('');
+                      try {
+                        await api(`/admin/languages/${l.id}`, {
+                          method: 'DELETE',
+                          token,
+                        });
+                        setMsg(`${l.code} deleted`);
+                        await refresh();
+                      } catch (err) {
+                        setError(
+                          err instanceof Error ? err.message : 'Delete failed',
+                        );
+                      }
+                    }}
+                  >
+                    Delete
+                  </button>
+                )}
+              </span>
+            </li>
+          ))}
+        </ul>
+        <form onSubmit={addLanguage} className="mt-4 grid gap-2 sm:grid-cols-4">
+          <input
+            className="hb-input"
+            placeholder="Code (bn)"
+            value={langCode}
+            onChange={(e) => setLangCode(e.target.value)}
+            required
+          />
+          <input
+            className="hb-input"
+            placeholder="Name (Bangla)"
+            value={langName}
+            onChange={(e) => setLangName(e.target.value)}
+            required
+          />
+          <input
+            className="hb-input"
+            placeholder="Native name"
+            value={langNative}
+            onChange={(e) => setLangNative(e.target.value)}
+            required
+          />
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={langRtl}
+              onChange={(e) => setLangRtl(e.target.checked)}
+            />
+            RTL
+          </label>
+          <button className="hb-btn hb-btn-primary sm:col-span-4">
+            Add language
+          </button>
+        </form>
+      </section>
+
+      <section className="hb-surface mb-8 p-5 shadow-sm">
         <h2 className="font-display text-xl font-semibold">Create shop</h2>
         <form onSubmit={createShop} className="mt-3 flex flex-wrap gap-2">
           <input
@@ -198,13 +560,14 @@ function PlatformInner() {
             onChange={(e) => setEmail(e.target.value)}
             required
           />
-          <input
-            className="hb-input"
-            type="password"
+          <PasswordInput
+            wrapperClassName="mt-0"
             placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
+            minLength={8}
+            autoComplete="new-password"
           />
           <input
             className="hb-input"

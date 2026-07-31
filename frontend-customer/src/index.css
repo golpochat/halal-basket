@@ -1,0 +1,102 @@
+@import 'tailwindcss';
+@import '../../shared/src/web/styles/tokens.css';
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--hb-ink);
+  font-family: var(--font-body);
+  background:
+    radial-gradient(ellipse 80% 50% at 10% -10%, rgba(47, 143, 91, 0.22), transparent 55%),
+    radial-gradient(ellipse 60% 40% at 100% 0%, rgba(201, 162, 39, 0.12), transparent 45%),
+    linear-gradient(180deg, var(--hb-cream) 0%, var(--hb-neutral-100) 100%);
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* Legacy class aliases used by admin / checkout pages */
+.hb-input {
+  width: 100%;
+  height: 2.5rem;
+  border-radius: var(--hb-radius);
+  border: 1px solid rgba(26, 92, 58, 0.18);
+  background: #fff;
+  padding: 0 0.75rem;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--hb-ink);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.hb-input:focus {
+  outline: none;
+  border-color: var(--hb-leaf);
+  box-shadow: 0 0 0 3px rgba(47, 143, 91, 0.2);
+}
+
+.hb-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  height: 2.5rem;
+  border-radius: var(--hb-radius);
+  border: none;
+  padding: 0 1.25rem;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s, background 0.15s, opacity 0.15s;
+}
+
+.hb-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.hb-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.hb-btn-primary {
+  background: var(--hb-green);
+  color: #fff;
+}
+
+a.hb-btn-primary {
+  color: #fff;
+}
+
+.hb-btn-primary:hover:not(:disabled) {
+  background: var(--hb-green-hover);
+  color: #fff;
+}
+
+.hb-btn-secondary {
+  background: #fff;
+  color: var(--hb-green);
+  border: 1px solid rgba(26, 92, 58, 0.2);
+}
+
+.hb-btn-ghost {
+  background: transparent;
+  color: var(--hb-green);
+  border: 1px solid rgba(26, 92, 58, 0.25);
+}
+
+.hb-btn-ghost:hover:not(:disabled) {
+  background: var(--hb-mist);
+}

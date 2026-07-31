@@ -3,16 +3,18 @@
   "private": true,
   "workspaces": [
     "backend",
-    "frontend",
+    "frontend-customer",
+    "frontend-shop",
+    "frontend-driver",
     "shared"
   ],
   "scripts": {
     "dev:backend": "npm run start:dev -w backend",
-    "dev:web": "npm run dev -w frontend",
-    "dev:customer": "npm run dev -w frontend",
-    "dev:shop": "npm run dev -w frontend",
-    "dev:driver": "npm run dev -w frontend",
-    "build": "npm run build -w shared && npm run build -w backend && npm run build -w frontend",
+    "dev:web": "npm run dev -w frontend-customer",
+    "dev:customer": "npm run dev -w frontend-customer",
+    "dev:shop": "npm run dev -w frontend-shop",
+    "dev:driver": "npm run dev -w frontend-driver",
+    "build": "npm run build -w shared && npm run build -w backend && npm run build -w frontend-customer && npm run build -w frontend-shop && npm run build -w frontend-driver",
     "db:migrate": "npm run prisma:migrate -w backend",
     "db:seed": "npm run prisma:seed -w backend",
     "db:generate": "npm run prisma:generate -w backend"

@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { RequireAuth, RequireRole } from '../../auth/guards';
 import { useAuth } from '../../auth/AuthContext';
-import { BrandLogo } from '../../components/brand/BrandLogo';
+import { SiteHeader } from '../../components/layout/SiteHeader';
+import { SiteFooter } from '../../components/layout/SiteFooter';
+import { LocalePickers } from '../../components/LocalePickers';
 import { api } from '../../lib/api';
 
 type Order = {
@@ -78,9 +80,14 @@ function ConfirmationInner() {
   }
 
   return (
-    <main className="mx-auto max-w-lg px-4 py-10 sm:px-6">
-      <BrandLogo size="sm" />
-      <h1 className="font-display mt-6 text-3xl font-semibold">
+    <div className="flex min-h-dvh flex-col">
+      <SiteHeader
+        variant="slim"
+        homeTo="/customer"
+        actions={<LocalePickers />}
+      />
+      <main className="mx-auto w-full max-w-lg flex-1 px-4 py-10 sm:px-6">
+      <h1 className="font-display text-3xl font-semibold">
         Order confirmed
       </h1>
       <p className="mt-2 text-[var(--hb-ink)]/65">
@@ -130,5 +137,7 @@ function ConfirmationInner() {
         <Link to="/customer">Continue shopping</Link>
       </div>
     </main>
+      <SiteFooter />
+    </div>
   );
 }

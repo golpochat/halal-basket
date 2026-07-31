@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Halal Basket — Logo options</title>
+    <style>
+      :root {
+        --ink: #13261c;
+        --green: #1a5c3a;
+        --mist: #e8f1eb;
+        --cream: #f7faf6;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: 'Segoe UI', system-ui, sans-serif;
+        color: var(--ink);
+        background: linear-gradient(180deg, var(--cream), var(--mist));
+        padding: 2rem;
+      }
+      h1 {
+        margin: 0 0 0.5rem;
+        font-size: 1.75rem;
+      }
+      p {
+        margin: 0 0 2rem;
+        opacity: 0.7;
+      }
+      .grid {
+        display: grid;
+        gap: 1.5rem;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        max-width: 1100px;
+      }
+      figure {
+        margin: 0;
+        background: #fff;
+        border: 1px solid rgba(26, 92, 58, 0.15);
+        border-radius: 1rem;
+        padding: 1.25rem;
+        text-align: center;
+      }
+      img {
+        width: 180px;
+        height: 180px;
+        object-fit: contain;
+        border-radius: 28px;
+        background: #ddd;
+      }
+      figcaption {
+        margin-top: 1rem;
+        font-weight: 700;
+        font-size: 1.1rem;
+      }
+      .hint {
+        display: block;
+        margin-top: 0.35rem;
+        font-weight: 400;
+        font-size: 0.9rem;
+        opacity: 0.65;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Halal Basket — logo / favicon options</h1>
+    <p>
+      Look at these images, then reply in chat with A, B, C, D, E, or
+      <strong>F</strong> (the A+C hybrid).
+    </p>
+    <div class="grid">
+      <figure>
+        <img src="./logo-options/A-basket-leaf.png" alt="Option A woven basket" />
+        <figcaption>
+          A
+          <span class="hint">Woven basket + leaf</span>
+        </figcaption>
+      </figure>
+      <figure>
+        <img src="./logo-options/B-monogram.png" alt="Option B monogram" />
+        <figcaption>
+          B
+          <span class="hint">Monogram + leaf</span>
+        </figcaption>
+      </figure>
+      <figure>
+        <img src="./logo-options/C-tote.png" alt="Option C tote bag" />
+        <figcaption>
+          C
+          <span class="hint">Grocery tote + produce</span>
+        </figcaption>
+      </figure>
+      <figure>
+        <img src="./logo-options/D-badge.png" alt="Option D badge" />
+        <figcaption>
+          D
+          <span class="hint">Badge basket</span>
+        </figcaption>
+      </figure>
+      <figure>
+        <img src="./logo-options/E-minimal.png" alt="Option E minimal" />
+        <figcaption>
+          E
+          <span class="hint">Minimal gold outline</span>
+        </figcaption>
+      </figure>
+      <figure style="outline: 3px solid #1a5c3a; outline-offset: 2px">
+        <img
+          src="./logo-options/F-basket-produce.png?v=5"
+          alt="Option F woven basket with drumstick and meat slice"
+          width="180"
+          height="180"
+        />
+        <figcaption>
+          F — NEW (A + C contents)
+          <span class="hint"
+            >Woven basket · okra, garlic, fish, chicken drumstick, beef/lamb slice, bottle gourd (lao)</span
+          >
+        </figcaption>
+      </figure>
+    </div>
+  </body>
+</html>

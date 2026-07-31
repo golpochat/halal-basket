@@ -1,9 +1,13 @@
-import { PrismaClient, UserRole, Weekday } from '@prisma/client';
-import * as bcrypt from 'bcrypt';
+import {
+  PrismaClient,
+  UserRole,
+  Weekday,
+} from "./generated/client";
+import * as bcrypt from "bcrypt";
 
 const prisma = new PrismaClient();
 
-const SEED_PASSWORD = process.env.SEED_PASSWORD ?? 'HalalBasket123!';
+const SEED_PASSWORD = process.env.SEED_PASSWORD ?? "HalalBasket123!";
 
 async function upsertUser(input: {
   email: string;
@@ -32,48 +36,48 @@ async function main() {
   const passwordHash = await bcrypt.hash(SEED_PASSWORD, 12);
 
   const superAdmin = await upsertUser({
-    email: 'superadmin@halalbasket.ie',
+    email: "superadmin@halalbasket.ie",
     role: UserRole.super_admin,
     passwordHash,
   });
 
   const admin = await upsertUser({
-    email: 'admin@halalbasket.ie',
+    email: "admin@halalbasket.ie",
     role: UserRole.admin,
     passwordHash,
   });
 
   const shopUser = await upsertUser({
-    email: 'shop@halalbasket.ie',
+    email: "shop@halalbasket.ie",
     role: UserRole.shop,
     passwordHash,
   });
 
   const driverUser = await upsertUser({
-    email: 'driver@halalbasket.ie',
+    email: "driver@halalbasket.ie",
     role: UserRole.driver,
     passwordHash,
   });
 
   const shop = await prisma.shop.upsert({
-    where: { id: '00000000-0000-4000-8000-000000000001' },
+    where: { id: "00000000-0000-4000-8000-000000000001" },
     update: {
-      name: 'Halal Basket Demo Shop',
-      address: 'Main Street, Lucan, Co. Dublin',
-      phone: '+353 1 000 0000',
-      email: 'shop@halalbasket.ie',
-      deliveryZones: ['Lucan', 'Swords', 'Tallaght'],
+      name: "Halal Basket Demo Shop",
+      address: "Main Street, Lucan, Co. Dublin",
+      phone: "+353 1 000 0000",
+      email: "shop@halalbasket.ie",
+      deliveryZones: ["Lucan", "Swords", "Tallaght"],
       lat: 53.3574,
       lng: -6.4473,
       isActive: true,
     },
     create: {
-      id: '00000000-0000-4000-8000-000000000001',
-      name: 'Halal Basket Demo Shop',
-      address: 'Main Street, Lucan, Co. Dublin',
-      phone: '+353 1 000 0000',
-      email: 'shop@halalbasket.ie',
-      deliveryZones: ['Lucan', 'Swords', 'Tallaght'],
+      id: "00000000-0000-4000-8000-000000000001",
+      name: "Halal Basket Demo Shop",
+      address: "Main Street, Lucan, Co. Dublin",
+      phone: "+353 1 000 0000",
+      email: "shop@halalbasket.ie",
+      deliveryZones: ["Lucan", "Swords", "Tallaght"],
       lat: 53.3574,
       lng: -6.4473,
       isActive: true,
@@ -91,46 +95,59 @@ async function main() {
   await prisma.driver.upsert({
     where: { userId: driverUser.id },
     update: {
-      name: 'Demo Driver',
-      phone: '+353 87 000 0000',
+      name: "Demo Driver",
+      phone: "+353 87 000 0000",
       isActive: true,
     },
     create: {
       userId: driverUser.id,
-      name: 'Demo Driver',
-      phone: '+353 87 000 0000',
+      name: "Demo Driver",
+      phone: "+353 87 000 0000",
       isActive: true,
     },
   });
 
   const sampleProducts = [
     {
-      name: 'Basmati Rice 5kg',
-      slug: 'basmati-rice-5kg',
-      barcode: '8901001000001',
-      sku: 'SKU-RICE-5',
-      description: 'Premium long grain',
+      name: "Basmati Rice 5kg",
+      slug: "basmati-rice-5kg",
+      barcode: "8901001000001",
+      sku: "SKU-RICE-5",
+      description: "Premium long grain",
+      category: "Pantry",
       price: 12.99,
     },
     {
-      name: 'Chicken Thighs 1kg',
-      slug: 'chicken-thighs-1kg',
-      barcode: '8901001000002',
-      sku: 'SKU-CHICK-1',
-      description: 'Halal chicken thighs',
+      name: "Chicken Thighs 1kg",
+      slug: "chicken-thighs-1kg",
+      barcode: "8901001000002",
+      sku: "SKU-CHICK-1",
+      description: "Halal chicken thighs",
+      category: "Meat & Poultry",
       price: 8.5,
     },
     {
-      name: 'Olive Oil 1L',
-      slug: 'olive-oil-1l',
-      barcode: '8901001000003',
-      sku: 'SKU-OIL-1',
-      description: 'Extra virgin',
+      name: "Olive Oil 1L",
+      slug: "olive-oil-1l",
+      barcode: "8901001000003",
+      sku: "SKU-OIL-1",
+      description: "Extra virgin",
+      category: "Pantry",
       price: 6.75,
     },
   ];
 
   for (const row of sampleProducts) {
+    const catSlug = row.category
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
+    const category = await prisma.category.upsert({
+      where: { slug: catSlug },
+      update: { name: row.category },
+      create: { name: row.category, slug: catSlug },
+    });
+
     const product = await prisma.product.upsert({
       where: { barcode: row.barcode },
       update: {
@@ -138,6 +155,7 @@ async function main() {
         slug: row.slug,
         description: row.description,
         sku: row.sku,
+        categoryId: category.id,
         isActive: true,
         qrCode: `HB-QR-${row.barcode}`,
       },
@@ -148,6 +166,7 @@ async function main() {
         sku: row.sku,
         barcode: row.barcode,
         qrCode: `HB-QR-${row.barcode}`,
+        categoryId: category.id,
         isActive: true,
       },
     });
@@ -172,9 +191,9 @@ async function main() {
   }
 
   const calendarSeed: Array<{ areaName: string; deliveryDay: Weekday }> = [
-    { areaName: 'Lucan', deliveryDay: Weekday.tuesday },
-    { areaName: 'Swords', deliveryDay: Weekday.friday },
-    { areaName: 'Tallaght', deliveryDay: Weekday.wednesday },
+    { areaName: "Lucan", deliveryDay: Weekday.tuesday },
+    { areaName: "Swords", deliveryDay: Weekday.friday },
+    { areaName: "Tallaght", deliveryDay: Weekday.wednesday },
   ];
 
   for (const row of calendarSeed) {
@@ -194,14 +213,124 @@ async function main() {
     });
   }
 
-  console.log('Seeded users:');
+  const currencySeed = [
+    {
+      code: "EUR",
+      symbol: "€",
+      name: "Euro",
+      exchangeRate: 1,
+      isDefault: true,
+      isPublished: true,
+      sortOrder: 0,
+    },
+    {
+      code: "GBP",
+      symbol: "£",
+      name: "British Pound",
+      exchangeRate: 0.86,
+      isDefault: false,
+      isPublished: false,
+      sortOrder: 1,
+    },
+    {
+      code: "USD",
+      symbol: "$",
+      name: "US Dollar",
+      exchangeRate: 1.08,
+      isDefault: false,
+      isPublished: false,
+      sortOrder: 2,
+    },
+  ];
+
+  for (const row of currencySeed) {
+    await prisma.platformCurrency.upsert({
+      where: { code: row.code },
+      update: {
+        symbol: row.symbol,
+        name: row.name,
+        exchangeRate: row.exchangeRate,
+        isDefault: row.isDefault,
+        isPublished: row.isPublished,
+        sortOrder: row.sortOrder,
+      },
+      create: row,
+    });
+  }
+
+  const languageSeed = [
+    {
+      code: "en",
+      name: "English",
+      nativeName: "English",
+      isRtl: false,
+      isDefault: true,
+      isPublished: true,
+      sortOrder: 0,
+    },
+    {
+      code: "bn",
+      name: "Bangla",
+      nativeName: "বাংলা",
+      isRtl: false,
+      isDefault: false,
+      isPublished: false,
+      sortOrder: 1,
+    },
+    {
+      code: "hi",
+      name: "Hindi",
+      nativeName: "हिन्दी",
+      isRtl: false,
+      isDefault: false,
+      isPublished: false,
+      sortOrder: 2,
+    },
+    {
+      code: "ur",
+      name: "Urdu",
+      nativeName: "اردو",
+      isRtl: true,
+      isDefault: false,
+      isPublished: false,
+      sortOrder: 3,
+    },
+    {
+      code: "ar",
+      name: "Arabic",
+      nativeName: "العربية",
+      isRtl: true,
+      isDefault: false,
+      isPublished: false,
+      sortOrder: 4,
+    },
+  ];
+
+  for (const row of languageSeed) {
+    await prisma.platformLanguage.upsert({
+      where: { code: row.code },
+      update: {
+        name: row.name,
+        nativeName: row.nativeName,
+        isRtl: row.isRtl,
+        isDefault: row.isDefault,
+        isPublished: row.isPublished,
+        sortOrder: row.sortOrder,
+      },
+      create: row,
+    });
+  }
+
+  console.log("Seeded users:");
   console.log(`  super_admin: ${superAdmin.email}`);
   console.log(`  admin:       ${admin.email}`);
   console.log(`  shop:        ${shopUser.email}`);
   console.log(`  driver:      ${driverUser.email}`);
   console.log(`Password: ${SEED_PASSWORD}`);
   console.log(`Demo shop: ${shop.name} (${shop.id})`);
-  console.log('Seeded delivery calendar: Lucan, Swords, Tallaght');
+  console.log("Seeded delivery calendar: Lucan, Swords, Tallaght");
+  console.log("Seeded currencies: EUR (default published), GBP, USD");
+  console.log("Seeded languages: en (default published), bn, hi, ur, ar");
 }
 
 main()

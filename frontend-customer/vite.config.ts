@@ -1,0 +1,20 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
+
+const root = path.dirname(fileURLToPath(import.meta.url));
+
+export default defineConfig({
+  plugins: [react(), tailwindcss()],
+  resolve: {
+    alias: {
+      '@halal-basket/web': path.resolve(root, '../shared/src/web'),
+    },
+  },
+  server: {
+    port: 5173,
+    fs: { allow: [path.resolve(root, '..')] },
+  },
+});

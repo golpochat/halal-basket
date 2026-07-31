@@ -2,6 +2,12 @@ generator client {
   provider = "prisma-client-js"
 }
 
+/// Seed/scripts client (kept outside gitignore so the IDE can resolve model delegates).
+generator clientTypes {
+  provider = "prisma-client-js"
+  output   = "../prisma/generated/client"
+}
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
@@ -326,4 +332,49 @@ model AuditLog {
   @@index([entityType, entityId])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+/// Platform currencies. EUR is the seeded default and cannot be unpublished/deleted while default.
+/// Shop/order amounts stay in the default currency; `exchangeRate` converts for display (units per 1 default).
+model PlatformCurrency {
+  id            String   @id @default(uuid())
+  code          String   @unique
+  symbol        String
+  name          String
+  /// Multiply default-currency amount by this to display in this currency. Default currency = 1.
+  exchangeRate  Decimal  @default(1) @map("exchange_rate") @db.Decimal(18, 8)
+  isDefault     Boolean  @default(false) @map("is_default")
+  isPublished   Boolean  @default(false) @map("is_published")
+  sortOrder     Int      @default(0) @map("sort_order")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@index([isPublished, sortOrder])
+  @@map("platform_currencies")
+}
+
+/// Platform languages. English is the seeded default and cannot be unpublished/deleted while default.
+model PlatformLanguage {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  name        String
+  nativeName  String   @map("native_name")
+  isRtl       Boolean  @default(false) @map("is_rtl")
+  isDefault   Boolean  @default(false) @map("is_default")
+  isPublished Boolean  @default(false) @map("is_published")
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([isPublished, sortOrder])
+  @@map("platform_languages")
+}
+
+/// Key/value platform config (e.g. hero_background_url).
+model PlatformSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("platform_settings")
 }

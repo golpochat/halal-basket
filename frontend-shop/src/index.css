@@ -1,0 +1,71 @@
+@import 'tailwindcss';
+@import '../../shared/src/web/styles/tokens.css';
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--hb-ink);
+  font-family: var(--font-body);
+  background:
+    radial-gradient(ellipse 80% 50% at 10% -10%, rgba(47, 143, 91, 0.18), transparent 55%),
+    linear-gradient(180deg, var(--hb-cream) 0%, var(--hb-neutral-100) 100%);
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.hb-input {
+  width: 100%;
+  border-radius: var(--hb-radius);
+  border: 1px solid rgba(19, 38, 28, 0.15);
+  background: #fff;
+  padding: 0.75rem 1rem;
+  font: inherit;
+}
+
+.hb-input:focus {
+  outline: none;
+  border-color: var(--hb-leaf);
+  box-shadow: 0 0 0 3px rgba(47, 143, 91, 0.2);
+}
+
+.hb-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: var(--hb-radius);
+  border: none;
+  padding: 0.75rem 1.25rem;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.hb-btn-primary {
+  background: var(--hb-green);
+  color: #fff;
+}
+
+.hb-btn-ghost {
+  background: transparent;
+  color: var(--hb-green);
+  border: 1px solid rgba(26, 92, 58, 0.25);
+}
+
+.hb-surface {
+  background: var(--hb-surface);
+  border: 1px solid rgba(26, 92, 58, 0.1);
+  border-radius: var(--hb-radius-lg);
+}

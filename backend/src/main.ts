@@ -1,15 +1,35 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { join } from 'path';
+import { createRequire } from 'module';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+
+const requireFromCwd = createRequire(join(process.cwd(), 'package.json'));
+
+function freeListenPort(port: number) {
+  try {
+    const { freePort } = requireFromCwd('./scripts/free-port.js') as {
+      freePort: (p: number, opts?: { quiet?: boolean }) => number[];
+    };
+    freePort(port, { quiet: true });
+  } catch {
+    /* script missing in some deploy layouts — listenWithRetry still helps */
+  }
+}
 
 async function listenWithRetry(
   app: Awaited<ReturnType<typeof NestFactory.create>>,
   port: number,
-  attempts = 5,
+  attempts = 8,
 ) {
   let lastError: unknown;
   for (let i = 0; i < attempts; i++) {
+    freeListenPort(port);
+    // Brief pause so Windows releases the socket after taskkill.
+    if (i > 0) {
+      await new Promise((r) => setTimeout(r, 300 * i));
+    }
     try {
       await app.listen(port);
       return;
@@ -22,8 +42,10 @@ async function listenWithRetry(
       if (code !== 'EADDRINUSE' || i === attempts - 1) {
         throw err;
       }
-      // Watch restarts on Windows often race the previous child exiting.
-      await new Promise((r) => setTimeout(r, 400 * (i + 1)));
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[boot] :${port} busy (attempt ${i + 1}/${attempts}), freeing and retrying…`,
+      );
     }
   }
   throw lastError;

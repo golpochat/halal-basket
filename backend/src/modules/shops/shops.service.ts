@@ -48,7 +48,11 @@ export class ShopsService {
         isVisible: true,
         product: { isActive: true },
       },
-      include: { product: true },
+      include: {
+        product: {
+          include: { category: true },
+        },
+      },
       orderBy: { product: { name: 'asc' } },
     });
   }

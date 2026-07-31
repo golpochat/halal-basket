@@ -18,6 +18,7 @@ import { DriverModule } from './modules/driver/driver.module';
 import { RiskEngineModule } from './modules/risk-engine/risk-engine.module';
 import { StockPredictionModule } from './modules/stock-prediction/stock-prediction.module';
 import { PaymentsModule } from './modules/payments/payments.module';
+import { PlatformLocaleModule } from './modules/platform-locale/platform-locale.module';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 import { HttpLoggingInterceptor } from './common/http-logging.interceptor';
 
@@ -49,6 +50,7 @@ import { HttpLoggingInterceptor } from './common/http-logging.interceptor';
     RiskEngineModule,
     StockPredictionModule,
     PaymentsModule,
+    PlatformLocaleModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

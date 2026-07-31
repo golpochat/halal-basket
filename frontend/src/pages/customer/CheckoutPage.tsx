@@ -2,12 +2,14 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { RequireAuth, RequireRole } from '../../auth/guards';
 import { useAuth } from '../../auth/AuthContext';
-import { BrandLogo } from '../../components/brand/BrandLogo';
+import { SiteHeader } from '../../components/layout/SiteHeader';
+import { SiteFooter } from '../../components/layout/SiteFooter';
+import { LocalePickers } from '../../components/LocalePickers';
 import { api } from '../../lib/api';
 
 type CheckoutDraft = {
   shopId: string;
-  items: Array<{ productId: string; quantity: number }>;
+  items: Array<{ productId: string; quantity: number; name?: string }>;
 };
 
 type Features = {
@@ -16,6 +18,17 @@ type Features = {
 };
 
 type Mode = 'pickup' | 'scheduled_delivery' | 'realtime_delivery';
+
+type CalendarRow = {
+  id: string;
+  areaName: string;
+  deliveryDay: string;
+};
+
+type ResolveResult = {
+  deliveryDate: string;
+  deliveryDay: string;
+};
 
 const STEPS = ['Cart', 'Fulfillment', 'Address', 'Confirm'] as const;
 
@@ -44,17 +57,49 @@ function CheckoutWizard() {
 
   const [step, setStep] = useState(0);
   const [features, setFeatures] = useState<Features | null>(null);
+  const [calendar, setCalendar] = useState<CalendarRow[]>([]);
   const [mode, setMode] = useState<Mode>('pickup');
-  const [area, setArea] = useState('Lucan');
+  const [area, setArea] = useState('');
   const [address, setAddress] = useState('');
+  const [nextDelivery, setNextDelivery] = useState<ResolveResult | null>(null);
+  const [areaError, setAreaError] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const areas = useMemo(() => {
+    return Array.from(new Set(calendar.map((r) => r.areaName))).sort();
+  }, [calendar]);
 
   useEffect(() => {
     api<Features>('/features')
       .then(setFeatures)
       .catch(() => setFeatures({ realtimeDelivery: false, multiShop: false }));
+    api<CalendarRow[]>('/delivery-calendar')
+      .then((rows) => {
+        setCalendar(rows);
+        if (rows[0] && !area) setArea(rows[0].areaName);
+      })
+      .catch(() => setCalendar([]));
   }, []);
+
+  useEffect(() => {
+    if (!area || mode === 'pickup') {
+      setNextDelivery(null);
+      setAreaError('');
+      return;
+    }
+    api<ResolveResult>(
+      `/delivery-calendar/resolve?area=${encodeURIComponent(area)}`,
+    )
+      .then((res) => {
+        setNextDelivery(res);
+        setAreaError('');
+      })
+      .catch((e) => {
+        setNextDelivery(null);
+        setAreaError(e instanceof Error ? e.message : 'Area not served');
+      });
+  }, [area, mode]);
 
   if (!draft?.items?.length) {
     return <Navigate to="/customer" replace />;
@@ -62,13 +107,25 @@ function CheckoutWizard() {
 
   function canNext() {
     if (step === 1) return !!mode;
-    if (step === 2 && mode !== 'pickup') return address.trim().length > 3;
+    if (step === 2 && mode !== 'pickup') {
+      return (
+        address.trim().length > 3 &&
+        !!area &&
+        areas.includes(area) &&
+        !!nextDelivery &&
+        !areaError
+      );
+    }
     return true;
   }
 
   async function placeOrder(e: FormEvent) {
     e.preventDefault();
     if (!session) return;
+    if (mode !== 'pickup' && (!areas.includes(area) || !nextDelivery)) {
+      setError('Choose a delivery area from the calendar before placing order');
+      return;
+    }
     setLoading(true);
     setError('');
     try {
@@ -77,14 +134,20 @@ function CheckoutWizard() {
           ? {
               fulfillmentMode: 'pickup',
               preferredShopId: draft!.shopId,
-              items: draft!.items,
+              items: draft!.items.map(({ productId, quantity }) => ({
+                productId,
+                quantity,
+              })),
             }
           : {
               fulfillmentMode: mode,
               deliveryAreaName: area,
               preferredShopId: draft!.shopId,
               deliveryAddress: { line1: address, area_name: area },
-              items: draft!.items,
+              items: draft!.items.map(({ productId, quantity }) => ({
+                productId,
+                quantity,
+              })),
             };
       const order = await api<{ id: string }>('/orders', {
         method: 'POST',
@@ -101,11 +164,14 @@ function CheckoutWizard() {
   }
 
   return (
-    <main className="mx-auto max-w-xl px-4 py-8 sm:px-6">
-      <Link to="/customer" className="inline-block">
-        <BrandLogo size="sm" />
-      </Link>
-      <h1 className="font-display mt-6 text-3xl font-semibold">Checkout</h1>
+    <div className="flex min-h-dvh flex-col">
+      <SiteHeader
+        variant="slim"
+        homeTo="/customer"
+        actions={<LocalePickers />}
+      />
+      <main className="mx-auto w-full max-w-xl flex-1 px-4 py-8 sm:px-6">
+      <h1 className="font-display text-3xl font-semibold">Checkout</h1>
       <div className="mt-4 flex gap-2">
         {STEPS.map((label, i) => (
           <div key={label} className="flex-1">
@@ -144,9 +210,7 @@ function CheckoutWizard() {
                   key={i.productId}
                   className="flex justify-between rounded-lg bg-[var(--hb-mist)]/60 px-3 py-2"
                 >
-                  <span className="font-mono text-xs">
-                    {i.productId.slice(0, 8)}…
-                  </span>
+                  <span>{i.name ?? `${i.productId.slice(0, 8)}…`}</span>
                   <span>× {i.quantity}</span>
                 </li>
               ))}
@@ -189,6 +253,12 @@ function CheckoutWizard() {
                 {label}
               </label>
             ))}
+            {mode === 'scheduled_delivery' && areas.length === 0 && (
+              <p className="text-sm text-red-700">
+                No delivery areas are configured yet. Choose pickup or check
+                back later.
+              </p>
+            )}
           </fieldset>
         )}
 
@@ -200,12 +270,38 @@ function CheckoutWizard() {
                 className="hb-input mt-1.5"
                 value={area}
                 onChange={(e) => setArea(e.target.value)}
+                required
               >
-                <option>Lucan</option>
-                <option>Swords</option>
-                <option>Tallaght</option>
+                {areas.length === 0 && (
+                  <option value="">No areas available</option>
+                )}
+                {areas.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
               </select>
             </label>
+            {nextDelivery && (
+              <p className="rounded-lg bg-[var(--hb-mist)] px-3 py-2 text-sm">
+                Next delivery:{' '}
+                <strong>
+                  {new Date(nextDelivery.deliveryDate).toLocaleDateString(
+                    undefined,
+                    {
+                      weekday: 'long',
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                    },
+                  )}
+                </strong>{' '}
+                ({nextDelivery.deliveryDay})
+              </p>
+            )}
+            {areaError && (
+              <p className="text-sm text-red-700">{areaError}</p>
+            )}
             <label className="block text-sm font-medium">
               Address
               <input
@@ -216,6 +312,13 @@ function CheckoutWizard() {
                 required
               />
             </label>
+            <p className="text-xs text-[var(--hb-ink)]/55">
+              Pilot delivery fee €3.99 · See{' '}
+              <Link to="/help" className="underline">
+                Help
+              </Link>{' '}
+              for refunds and pickup.
+            </p>
           </div>
         )}
 
@@ -230,6 +333,12 @@ function CheckoutWizard() {
               <>
                 <p>Area: {area}</p>
                 <p>Address: {address}</p>
+                {nextDelivery && (
+                  <p>
+                    Delivery day:{' '}
+                    {new Date(nextDelivery.deliveryDate).toLocaleDateString()}
+                  </p>
+                )}
               </>
             )}
           </div>
@@ -255,7 +364,13 @@ function CheckoutWizard() {
             </button>
           )}
           <button
-            disabled={loading || !canNext()}
+            disabled={
+              loading ||
+              !canNext() ||
+              (step === 1 &&
+                mode === 'scheduled_delivery' &&
+                areas.length === 0)
+            }
             className="hb-btn hb-btn-primary flex-1 py-3"
           >
             {step === 3
@@ -267,5 +382,7 @@ function CheckoutWizard() {
         </div>
       </form>
     </main>
+      <SiteFooter />
+    </div>
   );
 }

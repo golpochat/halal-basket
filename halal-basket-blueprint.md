@@ -499,14 +499,74 @@ Consume `order_events` and `driver_feedback`. Do not invent scores without persi
 
 # 11. Frontend — Customer
 
-`frontend-customer/src/`
+`frontend-customer/` — Vite + React + TypeScript + Tailwind. Dev server port **5173**.
 
-**MVP pages only:**
+## 11.1 Customer UI architecture (source of truth)
 
-- Catalogue (by shop or aggregated as designed)
-- Order form (pickup vs scheduled delivery)
+### Landing = catalogue
+
+- Route `/` **is** the catalogue homepage
+- `/catalogue` redirects to `/` for compatibility
+
+### Header (minimal)
+
+- Left: logo
+- Center: empty (search lives in the hero)
+- Right: location pill, Help, Sign in, Cart
+- Sticky on scroll
+- Mobile: location + cart (+ Categories control)
+
+### Hero (Chaldal-style)
+
+- Full-width search
+- Headline + subheadline
+- Trust indicators (verified halal, local stock, delivery/pickup, clear fees)
+- Delivery calendar preview
+
+### Category sidebar
+
+- Multi-level: category → sub-category → sub-sub-category (collapsible)
+- Icons + popular pins at top
+- Desktop sticky; mobile slide-in drawer
+- Popular categories tiles on the landing body
+
+### Product card (strict)
+
+- **One image only** (no gallery); placeholder if `imageUrl` missing
+- Name, price hierarchy, optional shop name, color-coded stock, Add to cart
+- Optional: verified halal badge, shop partner badge
+- Desktop hover elevation only
+
+### Catalogue grid
+
+- Mobile: 2 columns · Tablet: 3 · Desktop: 4–6
+- Recommended section must **not** duplicate products already in the main grid
+- Skeletons, empty, and error states required
+
+### Consistency
+
+- Shared design system in `shared/src/web/` (tokens, UI components, Zustand stores, React Query hooks)
+- Apps import via `@halal-basket/web` Vite alias
+- Shared `--hb-*` CSS tokens, typography (Fraunces display / Plus Jakarta body)
+- Button variants: primary / secondary / tertiary
+- Unified card radius/border; inline SVG icons (no extra icon library)
+- WCAG AA: focus states, labels, contrast
+- State: Zustand (cart, catalogue filters, auth, toasts)
+- Data: TanStack Query (shops, products, delivery calendar, …)
+
+### Enterprise enhancements (MVP+)
+
+Trust badges, delivery calendar preview, real-time stock when available, toasts, modals, sticky mobile cart CTA.
+
+## 11.2 MVP routes / pages
+
+- `/catalogue` — homepage
+- Checkout (pickup vs scheduled delivery)
 - Order confirmation
-- Order status (parent order + fulfillment status)
+- Order status
+- Help / FAQ
+- Sign-in / register
+- **Temporary:** `/admin`, `/super-admin` (role-gated) until a dedicated admin app exists
 
 Defer realtime delivery UI and multi-shop split UX to Phase 2.
 
@@ -514,29 +574,33 @@ Defer realtime delivery UI and multi-shop split UX to Phase 2.
 
 # 12. Frontend — Shop Portal
 
-`frontend-shop/src/`
+`frontend-shop/` — Vite + React + TypeScript + Tailwind. Dev server port **5174**.
 
 **MVP pages:**
 
-- Login
+- Login (shop role)
 - Dashboard
 - Orders (this shop’s fulfillments)
 - Products (stock + price)
 - Scheduled delivery prep (filter by `delivery_date`)
 
+Use the same design tokens and header/footer consistency as customer (shop-appropriate nav).
+
 ---
 
 # 13. Frontend — Driver
 
-`frontend-driver/src/`
+`frontend-driver/` — Vite + React + TypeScript + Tailwind. Dev server port **5175**.
 
 **MVP pages:**
 
-- Login
+- Login (driver role)
 - Today’s deliveries (assigned fulfillments)
 - Order / fulfillment detail
 - Delivery status update
 - Feedback form (rating, tags including `item_missing`)
+
+Same tokens and layout consistency; mobile-first.
 
 ---
 
@@ -584,6 +648,7 @@ Defer realtime delivery UI and multi-shop split UX to Phase 2.
 - Pickup orders must restrict products to one shop and one fulfillment
 - Orders use `order_fulfillments`; never assume a single `shop_id` on `orders`
 - Persist refunds/complaints/status changes as `order_events` so Phase 2 risk has real data
+- Platform locale: default currency EUR and language `en`; extras are dynamic CRUD with publish/unpublish; customer pickers only when 2+ published (see `docs/platform-locale.md`)
 - Do not add new libraries unless already in this blueprint’s stack (or explicitly approved)
 
 ---
