@@ -90,7 +90,7 @@ function RegisterForm() {
       >
         <div className="space-y-3">
           <h1 className="font-display text-3xl font-semibold">
-            Create your account
+            Sign up
           </h1>
           <div className="flex gap-2">
             {[1, 2].map((n) => (
@@ -186,8 +186,8 @@ function RegisterForm() {
             {step === 1
               ? 'Continue'
               : loading
-                ? 'Creating…'
-                : 'Create account'}
+                ? 'Signing up…'
+                : 'Sign up'}
           </button>
         </div>
 

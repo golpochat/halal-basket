@@ -1,4 +1,5 @@
 import {
+  Button,
   MenuSelect,
   UtilityIcons,
   useCatalogueStore,
@@ -18,6 +19,7 @@ export function ResultsToolbar({ count }: { count: number }) {
   const setViewMode = useCatalogueStore((s) => s.setViewMode);
   const sortBy = useCatalogueStore((s) => s.sortBy);
   const setSortBy = useCatalogueStore((s) => s.setSortBy);
+  const setFiltersOpen = useCatalogueStore((s) => s.setFiltersOpen);
 
   return (
     <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
@@ -27,6 +29,17 @@ export function ResultsToolbar({ count }: { count: number }) {
       </p>
 
       <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+        {/* Desktop only — mobile uses the sticky Filters bar */}
+        <Button
+          variant="tertiary"
+          size="sm"
+          className="hidden h-10 gap-[var(--hb-icon-gap)] lg:inline-flex"
+          onClick={() => setFiltersOpen(true)}
+        >
+          {UtilityIcons.filters({ size: 18 })}
+          Filters
+        </Button>
+
         <div
           className="flex h-10 overflow-hidden rounded-[var(--hb-radius)] border border-[rgba(26,92,58,0.18)] bg-white"
           role="group"

@@ -1,8 +1,10 @@
-import { useState, type ReactNode } from 'react';
-import { Link, NavLink } from 'react-router-dom';
+import { useEffect, useState, type ReactNode } from 'react';
+import { Link, NavLink, useLocation } from 'react-router-dom';
+import { UtilityIcons, ICON_SIZES } from '@halal-basket/web';
 import { BrandLogo } from '../brand/BrandLogo';
 import { useAuth } from '../../auth/AuthContext';
-import { homeForRole } from '../../lib/api';
+import { ProfileMenu } from './ProfileMenu';
+import { HB_CHROME_BAR } from './chrome';
 
 export type SiteNavItem = { to: string; label: string; end?: boolean };
 
@@ -22,34 +24,61 @@ export function SiteHeader({
   variant = 'site',
   showAuth = true,
 }: SiteHeaderProps) {
-  const { session, logout } = useAuth();
+  const { session } = useAuth();
+  const location = useLocation();
   const [open, setOpen] = useState(false);
   const isApp = variant === 'app';
   const isSlim = variant === 'slim';
+  const onLogin = location.pathname.startsWith('/login');
+  const onRegister = location.pathname.startsWith('/register');
 
-  const links: SiteNavItem[] =
-    nav.length > 0
-      ? nav
-      : isApp || isSlim
-        ? []
-        : [
-            { to: '/', label: 'Catalogue' },
-            { to: '/help', label: 'Help' },
-          ];
+  const links: SiteNavItem[] = nav;
 
-  const showMobileMenu =
-    links.length > 0 || (showAuth && !isApp && !isSlim);
+  const showGuestAuth = !session && (isSlim || (showAuth && !isApp));
+  // Only open a drawer when a page passes explicit nav items
+  const showMobileMenu = !isSlim && links.length > 0;
+
+  // Close drawer when crossing into desktop — avoids leftover open state
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)');
+    const onChange = () => {
+      if (mq.matches) setOpen(false);
+    };
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  const guestAuthLinks = (
+    <>
+      <Link
+        to="/login"
+        className="hb-btn hb-btn-ghost h-10 px-3.5 text-sm"
+        aria-current={onLogin ? 'page' : undefined}
+        onClick={() => setOpen(false)}
+      >
+        Sign in
+      </Link>
+      <Link
+        to="/register"
+        className="hb-btn hb-btn-primary h-10 px-3.5 text-sm"
+        aria-current={onRegister ? 'page' : undefined}
+        onClick={() => setOpen(false)}
+      >
+        Sign up
+      </Link>
+    </>
+  );
 
   return (
-    <header className="sticky top-0 z-40 border-b border-[rgba(26,92,58,0.1)] bg-[rgba(247,250,246,0.92)] backdrop-blur-md">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+    <header className="hb-header-shell sticky top-0 z-40 bg-[rgba(247,250,246,0.97)] backdrop-blur-md">
+      <div className={HB_CHROME_BAR}>
         <Link
           to={homeTo}
           className="shrink-0"
           onClick={() => setOpen(false)}
           aria-label="Halal Basket home"
         >
-          <BrandLogo size="sm" />
+          <BrandLogo size="lg" />
         </Link>
 
         {links.length > 0 && (
@@ -63,10 +92,10 @@ export function SiteHeader({
                 to={item.to}
                 end={item.end}
                 className={({ isActive }) =>
-                  `rounded-lg px-3 py-2 text-sm font-medium transition ${
+                  `rounded-[var(--hb-radius)] px-3 py-2 text-sm font-semibold transition duration-[220ms] ease-[var(--hb-ease-out)] ${
                     isActive
                       ? 'bg-[var(--hb-mist)] text-[var(--hb-green)]'
-                      : 'text-[var(--hb-ink)]/70 hover:bg-white/70'
+                      : 'text-[var(--hb-ink)]/70 hover:bg-[var(--hb-mist)] hover:text-[var(--hb-green)]'
                   }`
                 }
               >
@@ -76,163 +105,56 @@ export function SiteHeader({
           </nav>
         )}
 
-        <div className="flex min-w-0 items-center justify-end gap-1.5 sm:gap-2">
+        <div className="min-w-0 flex-1" />
+
+        <div className="flex shrink-0 items-center gap-2">
           {actions}
 
-          {isSlim && (
-            <Link
-              to="/help"
-              className="hb-btn hb-btn-ghost px-3 py-1.5 text-sm"
-            >
-              Help
-            </Link>
+          {showGuestAuth && (
+            <div className="flex items-center gap-2">{guestAuthLinks}</div>
           )}
 
-          {showAuth && !isApp && !isSlim && (
-            <div className="hidden items-center gap-1.5 sm:flex">
-              {session ? (
-                <>
-                  <Link
-                    to={homeForRole(session.user.role)}
-                    className="hb-btn hb-btn-ghost px-3 py-1.5 text-sm"
-                  >
-                    Dashboard
-                  </Link>
-                  <button
-                    type="button"
-                    className="hb-btn hb-btn-ghost px-3 py-1.5 text-sm"
-                    onClick={logout}
-                  >
-                    Sign out
-                  </button>
-                </>
-              ) : (
-                <>
-                  <Link
-                    to="/login"
-                    className="hb-btn hb-btn-ghost px-3 py-1.5 text-sm"
-                  >
-                    Sign in
-                  </Link>
-                  <Link
-                    to="/register"
-                    className="hb-btn hb-btn-primary px-3 py-1.5 text-sm"
-                  >
-                    Register
-                  </Link>
-                </>
-              )}
-            </div>
-          )}
-
-          {isSlim && showAuth && session && (
-            <button
-              type="button"
-              className="hb-btn hb-btn-ghost px-3 py-1.5 text-sm"
-              onClick={logout}
-            >
-              Sign out
-            </button>
-          )}
-
-          {isApp && session && (
-            <>
-              <span
-                className="hidden max-w-[10rem] truncate text-xs text-[var(--hb-ink)]/55 lg:inline"
-                title={session.user.email}
-              >
-                {session.user.email}
-              </span>
-              <button
-                type="button"
-                className="hb-btn hb-btn-ghost px-3 py-1.5 text-sm"
-                onClick={logout}
-              >
-                Sign out
-              </button>
-            </>
-          )}
+          {session && showAuth && <ProfileMenu />}
 
           {showMobileMenu && (
-            <button
-              type="button"
-              className="hb-btn hb-btn-ghost px-3 py-1.5 text-sm md:hidden"
-              aria-label={open ? 'Close menu' : 'Open menu'}
-              aria-expanded={open}
-              onClick={() => setOpen((v) => !v)}
-            >
-              {open ? 'Close' : 'Menu'}
-            </button>
+            <div className="md:hidden">
+              <button
+                type="button"
+                className="hb-icon-btn"
+                aria-label={open ? 'Close menu' : 'Open menu'}
+                aria-expanded={open}
+                onClick={() => setOpen((v) => !v)}
+              >
+                {open
+                  ? UtilityIcons.close({ size: ICON_SIZES.sm })
+                  : UtilityIcons.menu({ size: ICON_SIZES.sm })}
+              </button>
+            </div>
           )}
         </div>
       </div>
 
       {open && showMobileMenu && (
-        <div className="border-t border-[rgba(26,92,58,0.08)] px-4 py-3 md:hidden">
-          {links.length > 0 && (
-            <nav className="flex flex-col gap-1" aria-label="Mobile primary">
-              {links.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  end={item.end}
-                  onClick={() => setOpen(false)}
-                  className={({ isActive }) =>
-                    `rounded-lg px-3 py-2.5 text-sm font-medium ${
-                      isActive
-                        ? 'bg-[var(--hb-mist)] text-[var(--hb-green)]'
-                        : 'text-[var(--hb-ink)]/80'
-                    }`
-                  }
-                >
-                  {item.label}
-                </NavLink>
-              ))}
-            </nav>
-          )}
-
-          {showAuth && !isApp && !isSlim && (
-            <div className="mt-2 flex flex-col gap-1 border-t border-[rgba(26,92,58,0.08)] pt-2 sm:hidden">
-              {session ? (
-                <>
-                  <Link
-                    to={homeForRole(session.user.role)}
-                    className="rounded-lg px-3 py-2.5 text-sm font-medium"
-                    onClick={() => setOpen(false)}
-                  >
-                    Dashboard
-                  </Link>
-                  <button
-                    type="button"
-                    className="rounded-lg px-3 py-2.5 text-left text-sm font-medium"
-                    onClick={() => {
-                      setOpen(false);
-                      logout();
-                    }}
-                  >
-                    Sign out
-                  </button>
-                </>
-              ) : (
-                <>
-                  <Link
-                    to="/login"
-                    className="rounded-lg px-3 py-2.5 text-sm font-medium"
-                    onClick={() => setOpen(false)}
-                  >
-                    Sign in
-                  </Link>
-                  <Link
-                    to="/register"
-                    className="rounded-lg px-3 py-2.5 text-sm font-medium"
-                    onClick={() => setOpen(false)}
-                  >
-                    Register
-                  </Link>
-                </>
-              )}
-            </div>
-          )}
+        <div className="border-t border-[rgba(26,92,58,0.08)] px-3 py-3 sm:px-4 md:hidden lg:px-6">
+          <nav className="flex flex-col gap-1" aria-label="Mobile primary">
+            {links.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.end}
+                onClick={() => setOpen(false)}
+                className={({ isActive }) =>
+                  `rounded-[var(--hb-radius)] px-3 py-2.5 text-sm font-semibold ${
+                    isActive
+                      ? 'bg-[var(--hb-mist)] text-[var(--hb-green)]'
+                      : 'text-[var(--hb-ink)]/80'
+                  }`
+                }
+              >
+                {item.label}
+              </NavLink>
+            ))}
+          </nav>
         </div>
       )}
     </header>

@@ -7,6 +7,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Min,
 } from 'class-validator';
 
 export class CreateShopDto {
@@ -64,6 +65,11 @@ export class UpsertShopProductDto {
   @IsOptional()
   @IsBoolean()
   isInStock?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  stockQuantity?: number;
 
   @IsOptional()
   @IsBoolean()

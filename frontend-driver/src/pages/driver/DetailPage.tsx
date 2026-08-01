@@ -1,8 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { RequireAuth, RequireRole } from '../../auth/guards';
+import { ICON_SIZES, UtilityIcons, useDashboardTitle } from '@halal-basket/web';
 import { useAuth } from '../../auth/AuthContext';
-import { AppShell } from '../../components/ui/AppShell';
 import { api } from '../../lib/api';
 
 type Fulfillment = {
@@ -25,19 +24,8 @@ const STATUSES = [
   'cancelled',
 ] as const;
 
-const driverNav = [{ to: '/', label: 'Today', end: true }];
-
 export function DriverDetailPage() {
-  return (
-    <RequireAuth>
-      <RequireRole roles={['driver']}>
-        <DetailInner />
-      </RequireRole>
-    </RequireAuth>
-  );
-}
-
-function DetailInner() {
+  useDashboardTitle('Delivery detail');
   const { session } = useAuth();
   const { id } = useParams();
   const token = session!.accessToken;
@@ -101,13 +89,18 @@ function DetailInner() {
   }
 
   return (
-    <AppShell title="Delivery detail" nav={driverNav} homeTo="/">
-      <Link
-        to="/"
-        className="mb-4 inline-block text-sm font-medium text-[var(--hb-green)]"
-      >
-        ← Back to today
-      </Link>
+    <div>
+      <div className="mb-4">
+        <Link
+          to="/driver/dashboard"
+          className="hb-icon-btn inline-flex"
+          aria-label="Back to today"
+          title="Back to today"
+        >
+          {UtilityIcons.chevronLeft({ size: ICON_SIZES.sm })}
+        </Link>
+      </div>
+
       {error && (
         <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
           {error}
@@ -118,6 +111,7 @@ function DetailInner() {
           {msg}
         </p>
       )}
+
       {item && (
         <div className="mx-auto max-w-lg space-y-4">
           <div className="hb-surface space-y-2 p-4 shadow-sm">
@@ -138,20 +132,24 @@ function DetailInner() {
               ))}
             </ul>
           </div>
+
           <div className="flex flex-wrap gap-2">
             {STATUSES.map((s) => (
               <button
                 key={s}
                 type="button"
-                className={`hb-btn py-2.5 text-sm ${
-                  item.status === s ? 'hb-btn-primary' : 'hb-btn-ghost'
+                className={`hb-icon-btn px-3 py-2 text-xs font-medium capitalize ${
+                  item.status === s ? 'hb-icon-btn--primary' : ''
                 }`}
+                aria-label={`Set status to ${s.replaceAll('_', ' ')}`}
+                title={s.replaceAll('_', ' ')}
                 onClick={() => setStatus(s)}
               >
                 {s.replaceAll('_', ' ')}
               </button>
             ))}
           </div>
+
           <form
             onSubmit={sendFeedback}
             className="hb-surface space-y-3 p-4 shadow-sm"
@@ -191,6 +189,6 @@ function DetailInner() {
           </form>
         </div>
       )}
-    </AppShell>
+    </div>
   );
 }

@@ -46,9 +46,12 @@ export function createApiClient(baseUrl: string) {
 export const queryKeys = {
   shops: ['shops'] as const,
   shopProducts: (shopId: string) => ['shops', shopId, 'products'] as const,
+  platformCatalogue: (area?: string) =>
+    ['platform', 'catalogue', area ?? 'all'] as const,
   deliveryCalendar: ['delivery-calendar'] as const,
   features: ['features'] as const,
   platformLocale: ['platform-locale'] as const,
+  featuredCategories: ['platform', 'featured-categories'] as const,
   customerOrders: ['customer', 'orders'] as const,
   customerOrder: (id: string) => ['customer', 'orders', id] as const,
   shopPortalOrders: (deliveryDate?: string) =>

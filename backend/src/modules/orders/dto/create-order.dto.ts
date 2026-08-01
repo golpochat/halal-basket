@@ -38,6 +38,15 @@ export class CreateOrderDto {
   @IsObject()
   deliveryAddress?: Record<string, unknown>;
 
+  @IsOptional()
+  @IsString()
+  couponCode?: string;
+
+  /** Soft stock hold from POST /orders/stock-hold. */
+  @IsOptional()
+  @IsUUID()
+  holdId?: string;
+
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })

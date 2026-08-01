@@ -29,6 +29,26 @@ export class OrdersController {
     return this.orders.create(user.userId, dto);
   }
 
+  @Post('orders/route-preview')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.customer)
+  previewRoute(
+    @CurrentUser() user: JwtPayloadUser,
+    @Body() dto: CreateOrderDto,
+  ) {
+    return this.orders.previewRoute(user.userId, dto);
+  }
+
+  @Post('orders/stock-hold')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.customer)
+  createStockHold(
+    @CurrentUser() user: JwtPayloadUser,
+    @Body() dto: CreateOrderDto,
+  ) {
+    return this.orders.createStockHold(user.userId, dto);
+  }
+
   @Get('orders/:id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.customer, UserRole.admin, UserRole.super_admin)

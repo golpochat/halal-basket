@@ -1,9 +1,11 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { FulfillmentMode, Prisma, Shop } from '@prisma/client';
+import { FulfillmentMode, Prisma, Shop, ShopKind } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DeliveryCalendarService } from '../delivery-calendar/delivery-calendar.service';
 import { FeatureFlagsService } from '../../common/feature-flags.service';
 import { LatLng, MapsService } from '../maps/maps.service';
+import { WAREHOUSE_PUBLISHED_SETTING_KEY } from '../platform-locale/platform-locale.service';
+import { StockService } from '../stock/stock.service';
 
 export type RouteLineItem = {
   productId: string;
@@ -34,6 +36,7 @@ export class RoutingEngineService {
     private readonly calendar: DeliveryCalendarService,
     private readonly flags: FeatureFlagsService,
     private readonly maps: MapsService,
+    private readonly stock: StockService,
   ) {}
 
   async route(input: {
@@ -43,6 +46,8 @@ export class RoutingEngineService {
     deliveryAddress?: Record<string, unknown>;
     items: RouteLineItem[];
     customerRiskScore?: number;
+    /** Exclude this customer's active holds when checking available qty. */
+    customerId?: string;
   }): Promise<RoutingResult> {
     if (!input.items?.length) {
       throw new BadRequestException('Order must include at least one item');
@@ -52,7 +57,12 @@ export class RoutingEngineService {
       return {
         fulfillmentMode: FulfillmentMode.pickup,
         fulfillments: [
-          await this.routePickup(input.preferredShopId, input.items),
+          await this.routePickup({
+            preferredShopId: input.preferredShopId,
+            deliveryAreaName: input.deliveryAreaName,
+            items: input.items,
+            customerId: input.customerId,
+          }),
         ],
       };
     }
@@ -65,6 +75,7 @@ export class RoutingEngineService {
         deliveryAddress: input.deliveryAddress,
         items: input.items,
         resolveDate: true,
+        customerId: input.customerId,
       });
     }
 
@@ -90,6 +101,7 @@ export class RoutingEngineService {
         deliveryAddress: input.deliveryAddress,
         items: input.items,
         resolveDate: false,
+        customerId: input.customerId,
       });
     }
 
@@ -101,27 +113,159 @@ export class RoutingEngineService {
     return this.route(input);
   }
 
-  private async routePickup(
-    preferredShopId: string | undefined,
-    items: RouteLineItem[],
-  ): Promise<FulfillmentPlan> {
-    if (!preferredShopId) {
-      throw new BadRequestException('preferred_shop_id is required for pickup');
+  /**
+   * Dry-run fulfillment. Never returns shop identity.
+   * On failure, lists productIds that no area shop can fulfill.
+   */
+  async previewAvailability(input: {
+    fulfillmentMode: FulfillmentMode;
+    preferredShopId?: string;
+    deliveryAreaName?: string;
+    deliveryAddress?: Record<string, unknown>;
+    items: RouteLineItem[];
+    customerRiskScore?: number;
+    customerId?: string;
+  }): Promise<
+    | { ok: true }
+    | { ok: false; message: string; unavailableProductIds: string[] }
+  > {
+    try {
+      await this.route(input);
+      return { ok: true };
+    } catch (err) {
+      if (!(err instanceof BadRequestException)) throw err;
+      const unavailableProductIds = await this.collectUnavailableProductIds(
+        input,
+      );
+      return {
+        ok: false,
+        message: 'Some items are unavailable in this area',
+        unavailableProductIds,
+      };
     }
-    const shop = await this.prisma.shop.findFirst({
-      where: { id: preferredShopId, isActive: true },
-    });
-    if (!shop) {
-      throw new BadRequestException('Preferred shop not found or inactive');
+  }
+
+  private async collectUnavailableProductIds(input: {
+    fulfillmentMode: FulfillmentMode;
+    preferredShopId?: string;
+    deliveryAreaName?: string;
+    items: RouteLineItem[];
+  }): Promise<string[]> {
+    const area = input.deliveryAreaName?.trim();
+    let shops: Shop[] = [];
+
+    if (input.preferredShopId) {
+      const shop = await this.prisma.shop.findFirst({
+        where: { id: input.preferredShopId, isActive: true },
+      });
+      if (shop) shops = [shop];
+    } else if (area) {
+      shops = await this.shopsServingArea(area);
+    } else {
+      const warehousePublished = await this.isWarehousePublished();
+      shops = await this.prisma.shop.findMany({
+        where: {
+          isActive: true,
+          ...(warehousePublished ? {} : { kind: ShopKind.shop }),
+        },
+      });
     }
 
-    const linePricings = await this.requireFullStock(shop.id, items);
-    return {
-      shopId: shop.id,
-      deliveryDate: null,
-      estimatedDeliveryAt: null,
-      linePricings,
-    };
+    if (shops.length === 0) {
+      return input.items.map((i) => i.productId);
+    }
+
+    const unavailable: string[] = [];
+    for (const item of input.items) {
+      let ok = false;
+      for (const shop of shops) {
+        try {
+          await this.requireFullStock(shop.id, [item]);
+          ok = true;
+          break;
+        } catch {
+          /* next shop */
+        }
+      }
+      if (!ok) unavailable.push(item.productId);
+    }
+
+    // Full-basket failed but every line individually available (e.g. no single
+    // shop has everything and multi-shop is off) — mark all lines so UI can
+    // still block checkout with a clear list.
+    if (unavailable.length === 0) {
+      return input.items.map((i) => i.productId);
+    }
+    return unavailable;
+  }
+
+  private async routePickup(input: {
+    preferredShopId?: string;
+    deliveryAreaName?: string;
+    items: RouteLineItem[];
+    customerId?: string;
+  }): Promise<FulfillmentPlan> {
+    if (input.preferredShopId) {
+      const shop = await this.prisma.shop.findFirst({
+        where: { id: input.preferredShopId, isActive: true },
+      });
+      if (!shop) {
+        throw new BadRequestException('Preferred shop not found or inactive');
+      }
+      const linePricings = await this.requireFullStock(
+        shop.id,
+        input.items,
+        input.customerId,
+      );
+      return {
+        shopId: shop.id,
+        deliveryDate: null,
+        estimatedDeliveryAt: null,
+        linePricings,
+      };
+    }
+
+    const area = input.deliveryAreaName?.trim();
+    if (!area) {
+      throw new BadRequestException(
+        'delivery_area_name is required for pickup when preferred_shop_id is omitted',
+      );
+    }
+
+    const candidates = await this.shopsServingArea(area);
+    if (candidates.length === 0) {
+      throw new BadRequestException(
+        `No active shops serve area "${area}" for pickup`,
+      );
+    }
+
+    const origin = this.maps.areaCentroid(area);
+    const ordered = await this.orderFulfillmentCandidates(
+      candidates,
+      origin,
+    );
+
+    for (const shop of ordered) {
+      try {
+        const linePricings = await this.requireFullStock(
+          shop.id,
+          input.items,
+          input.customerId,
+        );
+        return {
+          shopId: shop.id,
+          deliveryDate: null,
+          estimatedDeliveryAt: null,
+          linePricings,
+        };
+      } catch {
+        /* try next */
+      }
+    }
+
+    throw new BadRequestException(
+      'No shop can fulfill this basket for pickup in the selected area',
+    );
   }
 
   private async routeDeliveryLike(input: {
@@ -131,6 +275,7 @@ export class RoutingEngineService {
     deliveryAddress?: Record<string, unknown>;
     items: RouteLineItem[];
     resolveDate: boolean;
+    customerId?: string;
   }): Promise<RoutingResult> {
     if (!input.deliveryAreaName?.trim()) {
       throw new BadRequestException(
@@ -159,7 +304,7 @@ export class RoutingEngineService {
       this.maps.extractLatLng(input.deliveryAddress) ??
       this.maps.areaCentroid(input.deliveryAreaName);
 
-    const ordered = this.sortByDistance(
+    const ordered = await this.orderFulfillmentCandidates(
       candidates,
       origin,
       input.preferredShopId,
@@ -168,7 +313,11 @@ export class RoutingEngineService {
     // Prefer single-shop fulfillment
     for (const shop of ordered) {
       try {
-        const linePricings = await this.requireFullStock(shop.id, input.items);
+        const linePricings = await this.requireFullStock(
+          shop.id,
+          input.items,
+          input.customerId,
+        );
         return {
           fulfillmentMode: input.mode,
           fulfillments: [
@@ -196,6 +345,7 @@ export class RoutingEngineService {
       input.items,
       deliveryDate,
       estimatedDeliveryAt,
+      input.customerId,
     );
 
     return { fulfillmentMode: input.mode, fulfillments };
@@ -206,6 +356,7 @@ export class RoutingEngineService {
     items: RouteLineItem[],
     deliveryDate: Date | null,
     estimatedDeliveryAt: Date | null,
+    customerId?: string,
   ): Promise<FulfillmentPlan[]> {
     const plans = new Map<string, FulfillmentPlan>();
 
@@ -213,7 +364,11 @@ export class RoutingEngineService {
       let assigned = false;
       for (const shop of shops) {
         try {
-          const [line] = await this.requireFullStock(shop.id, [item]);
+          const [line] = await this.requireFullStock(
+            shop.id,
+            [item],
+            customerId,
+          );
           const existing = plans.get(shop.id);
           if (existing) {
             existing.linePricings.push(line);
@@ -246,8 +401,12 @@ export class RoutingEngineService {
   }
 
   private async shopsServingArea(deliveryAreaName: string) {
+    const warehousePublished = await this.isWarehousePublished();
     const shops = await this.prisma.shop.findMany({
-      where: { isActive: true },
+      where: {
+        isActive: true,
+        ...(warehousePublished ? {} : { kind: ShopKind.shop }),
+      },
     });
     const area = deliveryAreaName.trim().toLowerCase();
     return shops.filter((shop) => {
@@ -258,6 +417,30 @@ export class RoutingEngineService {
         (z) => typeof z === 'string' && z.trim().toLowerCase() === area,
       );
     });
+  }
+
+  /** Warehouses first (when present), then partners by distance. */
+  private async orderFulfillmentCandidates(
+    candidates: Shop[],
+    origin: LatLng | null,
+    preferredShopId?: string,
+  ): Promise<Shop[]> {
+    const warehouses = candidates.filter((s) => s.kind === ShopKind.warehouse);
+    const partners = candidates.filter((s) => s.kind !== ShopKind.warehouse);
+    const orderedWarehouses = this.sortByDistance(warehouses, origin);
+    const orderedPartners = this.sortByDistance(
+      partners,
+      origin,
+      preferredShopId,
+    );
+    return [...orderedWarehouses, ...orderedPartners];
+  }
+
+  private async isWarehousePublished() {
+    const row = await this.prisma.platformSetting.findUnique({
+      where: { key: WAREHOUSE_PUBLISHED_SETTING_KEY },
+    });
+    return row?.value === 'true';
   }
 
   private sortByDistance(
@@ -292,7 +475,11 @@ export class RoutingEngineService {
     return copy;
   }
 
-  private async requireFullStock(shopId: string, items: RouteLineItem[]) {
+  private async requireFullStock(
+    shopId: string,
+    items: RouteLineItem[],
+    customerId?: string,
+  ) {
     const productIds = items.map((i) => i.productId);
     const shopProducts = await this.prisma.shopProduct.findMany({
       where: {
@@ -300,6 +487,7 @@ export class RoutingEngineService {
         productId: { in: productIds },
         isVisible: true,
         isInStock: true,
+        stockQuantity: { gt: 0 },
         product: { isActive: true },
       },
     });
@@ -315,6 +503,14 @@ export class RoutingEngineService {
       if (!sp) {
         throw new BadRequestException(
           `Product ${item.productId} unavailable at shop ${shopId}`,
+        );
+      }
+      const available = await this.stock.availableQty(sp.id, {
+        excludeCustomerId: customerId,
+      });
+      if (item.quantity > available) {
+        throw new BadRequestException(
+          `Product ${item.productId} insufficient stock at shop ${shopId}`,
         );
       }
       const unitPrice = sp.discountPrice ?? sp.price;

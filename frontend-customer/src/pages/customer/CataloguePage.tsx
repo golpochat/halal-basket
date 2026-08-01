@@ -6,17 +6,14 @@ import {
   ProductCard,
   ProductCardSkeleton,
   ProductGrid,
-  MenuSelect,
   UtilityIcons,
-  TrustLocalStockIcon,
   collectMatchNames,
   deriveStockLevel,
   findCategoryNode,
   useCartStore,
   useCatalogueStore,
   useDeliveryCalendarQuery,
-  useShopProductsQuery,
-  useShopsQuery,
+  usePlatformCatalogueQuery,
   useToastStore,
 } from '@halal-basket/web';
 import { AppHeader } from '../../components/layout/AppHeader';
@@ -42,36 +39,35 @@ export function CataloguePage() {
   const goHome = useCatalogueStore((s) => s.goHome);
   const area = useCatalogueStore((s) => s.area);
   const setArea = useCatalogueStore((s) => s.setArea);
-  const shopId = useCatalogueStore((s) => s.shopId);
-  const setShopId = useCatalogueStore((s) => s.setShopId);
   const filters = useCatalogueStore((s) => s.filters);
   const setFiltersOpen = useCatalogueStore((s) => s.setFiltersOpen);
   const viewMode = useCatalogueStore((s) => s.viewMode);
   const sortBy = useCatalogueStore((s) => s.sortBy);
   const pushRecent = useCatalogueStore((s) => s.pushRecent);
 
-  const cartShopId = useCartStore((s) => s.shopId);
-  const setCartShopId = useCartStore((s) => s.setShopId);
   const lines = useCartStore((s) => s.lines);
   const add = useCartStore((s) => s.add);
   const setQty = useCartStore((s) => s.setQty);
 
-  const shopsQuery = useShopsQuery(api);
-  const calendarQuery = useDeliveryCalendarQuery(api);
-  const productsQuery = useShopProductsQuery(api, shopId);
-
-  const shops = shopsQuery.data ?? [];
-  const products = productsQuery.data ?? [];
   const isHome = browsePath.length === 0 && !search.trim();
   const currentId = browsePath[browsePath.length - 1] ?? null;
   const currentNode = currentId ? findCategoryNode(currentId) : null;
   const childNodes = currentNode?.children ?? [];
   const showSubcategories =
     browsePath.length > 0 && childNodes.length > 0 && !search.trim();
-  const showProducts =
+  const needsProducts =
     Boolean(search.trim()) ||
-    (browsePath.length > 0 && childNodes.length === 0) ||
-    isHome;
+    (browsePath.length > 0 && childNodes.length === 0);
+  const showProducts = needsProducts;
+
+  const calendarQuery = useDeliveryCalendarQuery(api);
+  const productsQuery = usePlatformCatalogueQuery(
+    api,
+    area || undefined,
+    needsProducts,
+  );
+
+  const products = productsQuery.data ?? [];
 
   const areas = useMemo(() => {
     const rows = calendarQuery.data ?? [];
@@ -99,22 +95,12 @@ export function CataloguePage() {
   }, [browsePath]);
 
   useEffect(() => {
-    if (shops[0] && !shopId) {
-      setShopId(shops[0].id);
-      if (!cartShopId) setCartShopId(shops[0].id);
-    }
-  }, [shops, shopId, cartShopId, setShopId, setCartShopId]);
-
-  useEffect(() => {
     if (areas[0] && !area) setArea(areas[0]);
   }, [areas, area, setArea]);
 
-  const shopName = shops.find((s) => s.id === shopId)?.name ?? '';
-
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const matchNames =
-      !currentNode || isHome ? null : collectMatchNames(currentNode);
+    const matchNames = currentNode ? collectMatchNames(currentNode) : null;
 
     let list = products.filter((p) => {
       if (matchNames && !q) {
@@ -149,22 +135,7 @@ export function CataloguePage() {
     });
 
     return list;
-  }, [products, search, currentNode, isHome, filters, sortBy]);
-
-  const recommended = useMemo(() => {
-    if (!isHome) return [];
-    const primaryIds = new Set(
-      filtered.slice(0, 6).map((p) => p.productId),
-    );
-    return products
-      .filter((p) => p.isInStock && !primaryIds.has(p.productId))
-      .slice(0, 4);
-  }, [isHome, products, filtered]);
-
-  function onShopChange(id: string) {
-    setShopId(id);
-    setCartShopId(id);
-  }
+  }, [products, search, currentNode, filters, sortBy]);
 
   function handleAdd(p: (typeof products)[0]) {
     const price = Number(p.discountPrice ?? p.price);
@@ -172,22 +143,22 @@ export function CataloguePage() {
       productId: p.productId,
       name: p.product.name,
       price,
-      shopId,
-      shopName,
+      imageUrl: p.product.imageUrl,
     });
     pushRecent(p.productId);
     toast(`Added ${p.product.name}`);
   }
 
   const loading =
-    shopsQuery.isLoading || (Boolean(shopId) && productsQuery.isLoading);
-  const error =
-    shopsQuery.error ?? calendarQuery.error ?? productsQuery.error;
+    calendarQuery.isLoading ||
+    (needsProducts && productsQuery.isLoading);
+  const error = needsProducts
+    ? (calendarQuery.error ?? productsQuery.error)
+    : calendarQuery.error;
 
   function retry() {
-    void shopsQuery.refetch();
     void calendarQuery.refetch();
-    void productsQuery.refetch();
+    if (needsProducts) void productsQuery.refetch();
   }
 
   function renderCard(p: (typeof products)[0], keyPrefix = '') {
@@ -203,7 +174,6 @@ export function CataloguePage() {
           name: p.product.name,
           price,
           imageUrl: p.product.imageUrl,
-          shopName,
           stock: deriveStockLevel(p.isInStock),
           verifiedHalal: true,
           shopPartner: true,
@@ -223,7 +193,7 @@ export function CataloguePage() {
       <div className="flex min-h-0 w-full flex-1">
         <CategorySidebar />
 
-        <div className="min-w-0 flex-1">
+        <div className="hb-catalogue-main">
           {isHome && (
             <>
               <CatalogueHero areaSummary={areaSummary} />
@@ -231,18 +201,21 @@ export function CataloguePage() {
             </>
           )}
 
-          <div className="sticky top-14 z-30 flex gap-2 border-b border-[rgba(26,92,58,0.08)] bg-[rgba(247,250,246,0.97)] px-4 py-2 backdrop-blur-md sm:top-16 lg:hidden">
-            <Button
-              variant="tertiary"
-              size="sm"
-              className="w-full gap-[var(--hb-icon-gap)]"
-              onClick={() => setFiltersOpen(true)}
-            >
-              {UtilityIcons.filters({ size: 18 })}
-              Filters
-            </Button>
-          </div>
+          {showProducts && (
+            <div className="sticky top-16 z-30 flex gap-2 border-b border-[rgba(26,92,58,0.08)] bg-[rgba(247,250,246,0.97)] px-4 py-2 backdrop-blur-md sm:top-20 lg:hidden">
+              <Button
+                variant="tertiary"
+                size="sm"
+                className="w-full gap-[var(--hb-icon-gap)]"
+                onClick={() => setFiltersOpen(true)}
+              >
+                {UtilityIcons.filters({ size: 18 })}
+                Filters
+              </Button>
+            </div>
+          )}
 
+          {(!isHome || showSubcategories || showProducts) && (
           <main
             id="catalogue-grid"
             className="scroll-mt-24 px-4 py-6 sm:px-6 sm:py-8"
@@ -292,43 +265,16 @@ export function CataloguePage() {
 
             {showProducts && (
               <>
-                <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                  <div>
-                    <h2 className="font-display text-xl font-semibold sm:text-2xl">
-                      {isHome
-                        ? 'All products'
-                        : search.trim()
-                          ? 'Search results'
-                          : (currentNode?.name ?? 'Products')}
-                    </h2>
-                    <p className="mt-1 text-sm text-[var(--hb-ink)]/55">
-                      {shopName || 'Choose a pickup shop'}
-                      {area ? ` · ${area}` : ''}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {shops.length > 0 && (
-                      <MenuSelect
-                        label="Shop / pickup location"
-                        value={shopId}
-                        options={shops.map((s) => ({
-                          value: s.id,
-                          label: s.name,
-                        }))}
-                        onChange={onShopChange}
-                        triggerClassName="min-w-[12rem] max-w-[16rem] sm:max-w-[20rem]"
-                      />
-                    )}
-                    <Button
-                      variant="tertiary"
-                      size="sm"
-                      className="hidden h-10 gap-[var(--hb-icon-gap)] lg:inline-flex"
-                      onClick={() => setFiltersOpen(true)}
-                    >
-                      {UtilityIcons.filters({ size: 18 })}
-                      Filters
-                    </Button>
-                  </div>
+                <div className="mb-5">
+                  <h2 className="font-display text-xl font-semibold sm:text-2xl">
+                    {search.trim()
+                      ? 'Search results'
+                      : (currentNode?.name ?? 'Products')}
+                  </h2>
+                  <p className="mt-1 text-sm text-[var(--hb-ink)]/55">
+                    Halal Basket
+                    {area ? ` · ${area}` : ''}
+                  </p>
                 </div>
 
                 {!loading && !error && (
@@ -359,7 +305,7 @@ export function CataloguePage() {
                 {!loading && !error && filtered.length === 0 && (
                   <EmptyState
                     title="No products found."
-                    description="Try another category, shop, filter, or search term."
+                    description="Try another category, filter, area, or search term."
                   />
                 )}
 
@@ -368,36 +314,10 @@ export function CataloguePage() {
                     {filtered.map((p) => renderCard(p))}
                   </ProductGrid>
                 )}
-
-                {!loading && recommended.length > 0 && (
-                  <section
-                    className="mt-12 border-t border-[rgba(26,92,58,0.08)] pt-10"
-                    aria-labelledby="recommended-heading"
-                  >
-                    <div className="mb-1 flex items-center gap-[var(--hb-icon-gap)]">
-                      <span className="hb-icon-badge hb-icon-badge--sm" aria-hidden>
-                        <TrustLocalStockIcon size={18} />
-                      </span>
-                      <h2
-                        id="recommended-heading"
-                        className="font-display text-xl font-semibold sm:text-2xl"
-                      >
-                        Recommended for you
-                      </h2>
-                    </div>
-                    <p className="text-sm text-[var(--hb-ink)]/55">
-                      In-stock picks that are not already in the grid above
-                    </p>
-                    <div className="mt-5">
-                      <ProductGrid layout={viewMode}>
-                        {recommended.map((p) => renderCard(p, 'rec-'))}
-                      </ProductGrid>
-                    </div>
-                  </section>
-                )}
               </>
             )}
           </main>
+          )}
         </div>
       </div>
 

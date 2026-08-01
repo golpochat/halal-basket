@@ -1,8 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { RequireAuth, RequireRole } from '../../auth/guards';
+import { ICON_SIZES, UtilityIcons } from '@halal-basket/web';
 import { useAuth } from '../../auth/AuthContext';
-import { AppShell } from '../../components/ui/AppShell';
 import { api } from '../../lib/api';
 
 type Fulfillment = {
@@ -17,65 +16,135 @@ type Fulfillment = {
   };
 };
 
-const driverNav = [{ to: '/', label: 'Today', end: true }];
+const PAGE_SIZE = 10;
 
 export function DriverTodayPage() {
-  return (
-    <RequireAuth>
-      <RequireRole roles={['driver']}>
-        <TodayInner />
-      </RequireRole>
-    </RequireAuth>
-  );
-}
-
-function TodayInner() {
   const { session } = useAuth();
   const [orders, setOrders] = useState<Fulfillment[]>([]);
   const [error, setError] = useState('');
+  const [page, setPage] = useState(1);
+
+  async function refresh() {
+    const list = await api<Fulfillment[]>('/driver/orders/today', {
+      token: session!.accessToken,
+    });
+    setOrders(list);
+  }
 
   useEffect(() => {
-    api<Fulfillment[]>('/driver/orders/today', {
-      token: session!.accessToken,
-    })
-      .then(setOrders)
-      .catch((e) => setError(e.message));
+    refresh().catch((e) => setError(e.message));
   }, [session]);
 
+  const totalPages = Math.max(1, Math.ceil(orders.length / PAGE_SIZE));
+  const pageSafe = Math.min(page, totalPages);
+  const pageRows = useMemo(() => {
+    const start = (pageSafe - 1) * PAGE_SIZE;
+    return orders.slice(start, start + PAGE_SIZE);
+  }, [orders, pageSafe]);
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
   return (
-    <AppShell title="Today’s deliveries" nav={driverNav} homeTo="/">
+    <div>
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+        <p className="text-sm text-[var(--hb-ink)]/55">
+          {orders.length} deliveries today · {PAGE_SIZE} per page
+        </p>
+        <button
+          type="button"
+          className="hb-icon-btn"
+          aria-label="Refresh deliveries"
+          title="Refresh"
+          onClick={() => refresh().catch((e) => setError(e.message))}
+        >
+          {UtilityIcons.refresh({ size: ICON_SIZES.sm })}
+        </button>
+      </div>
+
       {error && (
         <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
           {error}
         </p>
       )}
-      <div className="mx-auto max-w-lg space-y-3">
-        {orders.map((f) => (
-          <Link
-            key={f.id}
-            to={`/orders/${f.id}`}
-            className="hb-surface block p-4 shadow-sm transition hover:-translate-y-0.5"
-          >
-            <div className="flex justify-between gap-2">
-              <span className="font-semibold">
-                {f.order.customer?.name ?? 'Customer'}
-              </span>
-              <span className="text-sm font-medium text-[var(--hb-green)]">
-                {f.status.replaceAll('_', ' ')}
-              </span>
-            </div>
-            <p className="mt-1 text-sm text-[var(--hb-ink)]/60">
-              {f.shop?.name ?? 'Shop'} ·{' '}
-              {f.order.fulfillmentMode.replaceAll('_', ' ')}
-            </p>
-          </Link>
-        ))}
-        {orders.length === 0 && (
-          <p className="text-[var(--hb-ink)]/55">
-            No deliveries assigned for today.
-          </p>
-        )}
+
+      <div className="hb-data-table-wrap">
+        <table className="hb-data-table">
+          <thead>
+            <tr>
+              <th>Customer</th>
+              <th>Status</th>
+              <th>Shop</th>
+              <th>Mode</th>
+              <th style={{ textAlign: 'right' }}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pageRows.map((f) => (
+              <tr key={f.id}>
+                <td className="font-semibold">
+                  {f.order.customer?.name ?? 'Customer'}
+                </td>
+                <td className="font-medium text-[var(--hb-green)]">
+                  {f.status.replaceAll('_', ' ')}
+                </td>
+                <td className="text-[var(--hb-ink)]/65">
+                  {f.shop?.name ?? 'Shop'}
+                </td>
+                <td className="text-[var(--hb-ink)]/65">
+                  {f.order.fulfillmentMode.replaceAll('_', ' ')}
+                </td>
+                <td>
+                  <div className="hb-data-table__actions">
+                    <Link
+                      to={`/driver/orders/${f.id}`}
+                      className="hb-icon-btn"
+                      aria-label={`View delivery for ${f.order.customer?.name ?? 'customer'}`}
+                      title="View detail"
+                    >
+                      {UtilityIcons.chevronRight({ size: ICON_SIZES.sm })}
+                    </Link>
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {pageRows.length === 0 && (
+              <tr>
+                <td colSpan={5} className="text-[var(--hb-ink)]/55">
+                  No deliveries assigned for today.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
-    </AppShell>
+
+      <div className="hb-pagination">
+        <span>
+          Page {pageSafe} of {totalPages}
+        </span>
+        <div className="hb-pagination__controls">
+          <button
+            type="button"
+            className="hb-icon-btn"
+            aria-label="Previous page"
+            disabled={pageSafe <= 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+          >
+            {UtilityIcons.chevronLeft({ size: ICON_SIZES.sm })}
+          </button>
+          <button
+            type="button"
+            className="hb-icon-btn"
+            aria-label="Next page"
+            disabled={pageSafe >= totalPages}
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+          >
+            {UtilityIcons.chevronRight({ size: ICON_SIZES.sm })}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

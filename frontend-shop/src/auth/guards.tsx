@@ -1,6 +1,16 @@
 import { Navigate, useLocation } from 'react-router-dom';
+import { isExternalHome } from '@halal-basket/web';
 import { homeForRole } from '../lib/api';
 import { useAuthStore } from './auth-store';
+
+function redirectHome(role: string) {
+  const dest = homeForRole(role);
+  if (isExternalHome(dest)) {
+    window.location.replace(dest);
+    return null;
+  }
+  return <Navigate to={dest} replace />;
+}
 
 export function RequireAuth({ children }: { children: React.ReactNode }) {
   const session = useAuthStore((s) => s.session);
@@ -22,7 +32,7 @@ export function RequireRole({
   const session = useAuthStore((s) => s.session);
   if (!session) return <Navigate to="/login" replace />;
   if (!roles.includes(session.user.role)) {
-    return <Navigate to={homeForRole(session.user.role)} replace />;
+    return redirectHome(session.user.role);
   }
   return children;
 }
@@ -30,7 +40,7 @@ export function RequireRole({
 export function GuestOnly({ children }: { children: React.ReactNode }) {
   const session = useAuthStore((s) => s.session);
   if (session) {
-    return <Navigate to={homeForRole(session.user.role)} replace />;
+    return redirectHome(session.user.role);
   }
   return children;
 }

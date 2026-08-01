@@ -20,7 +20,7 @@ export function ProductImage({
       <img
         src={src!}
         alt={alt}
-        className={`h-full w-full object-cover ${className}`}
+        className={`hb-product-card__media-img h-full w-full object-cover ${className}`}
         loading="lazy"
         onError={() => setFailed(true)}
       />
@@ -34,7 +34,7 @@ export function ProductImage({
 
   return (
     <div
-      className={`flex h-full w-full flex-col items-center justify-center gap-1.5 bg-[linear-gradient(145deg,var(--hb-mist)_0%,rgba(26,92,58,0.14)_100%)] ${className}`}
+      className={`hb-product-card__media-img flex h-full w-full flex-col items-center justify-center gap-1.5 bg-[linear-gradient(145deg,var(--hb-mist)_0%,rgba(26,92,58,0.14)_100%)] ${className}`}
       role="img"
       aria-label={alt || 'Halal Basket'}
     >

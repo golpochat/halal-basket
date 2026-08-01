@@ -7,7 +7,7 @@ type Props = {
 const sizes = {
   sm: { mark: 28, text: 'text-lg' },
   md: { mark: 36, text: 'text-xl' },
-  lg: { mark: 52, text: 'text-3xl' },
+  lg: { mark: 56, text: 'text-3xl' },
 };
 
 export function BrandLogo({

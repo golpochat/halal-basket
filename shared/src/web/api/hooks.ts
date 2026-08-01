@@ -11,11 +11,32 @@ export function useShopsQuery(api: Api) {
   });
 }
 
-export function useShopProductsQuery(api: Api, shopId: string) {
+export function useShopProductsQuery(
+  api: Api,
+  shopId: string,
+  enabled = true,
+) {
   return useQuery({
     queryKey: queryKeys.shopProducts(shopId),
     queryFn: () => api<ShopProduct[]>(`/shops/${shopId}/products`),
-    enabled: Boolean(shopId),
+    enabled: Boolean(shopId) && enabled,
+  });
+}
+
+/** Brand catalogue: aggregated across shops; optional area scopes stock. */
+export function usePlatformCatalogueQuery(
+  api: Api,
+  area?: string,
+  enabled = true,
+) {
+  const areaKey = area?.trim() || undefined;
+  return useQuery({
+    queryKey: queryKeys.platformCatalogue(areaKey),
+    queryFn: () => {
+      const q = areaKey ? `?area=${encodeURIComponent(areaKey)}` : '';
+      return api<ShopProduct[]>(`/platform/catalogue${q}`);
+    },
+    enabled,
   });
 }
 
@@ -39,5 +60,23 @@ export function useBrandingQuery(api: Api) {
     queryKey: ['platform', 'branding'] as const,
     queryFn: () =>
       api<{ heroBackgroundUrl: string | null }>('/platform/branding'),
+  });
+}
+
+export type FeaturedCategory = {
+  id: string;
+  name: string;
+  sortOrder: number;
+};
+
+export function useFeaturedCategoriesQuery(api: Api) {
+  return useQuery({
+    queryKey: queryKeys.featuredCategories,
+    queryFn: () =>
+      api<{
+        categories: FeaturedCategory[];
+        minVisible: number;
+        maxVisible: number;
+      }>('/platform/featured-categories'),
   });
 }

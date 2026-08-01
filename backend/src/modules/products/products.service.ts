@@ -121,19 +121,21 @@ export class ProductsService {
         where: {
           shopId_productId: { shopId, productId },
         },
-        update: {
-          stockStatusSource: 'import',
-          lastStockUpdateAt: new Date(),
-          isVisible: true,
-        },
         create: {
           shopId,
           productId,
           price: new Prisma.Decimal(0),
           isInStock: true,
+          stockQuantity: 50,
           stockStatusSource: 'import',
           lastStockUpdateAt: new Date(),
           isVisible: true,
+        },
+        update: {
+          stockStatusSource: 'import',
+          lastStockUpdateAt: new Date(),
+          isVisible: true,
+          // Keep existing qty on re-import; only seed qty when creating.
         },
       });
     }

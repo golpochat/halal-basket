@@ -1,11 +1,19 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { Weekday } from '@prisma/client';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { Prisma, Weekday } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   nextDateForWeekday,
   startOfUtcDay,
   WeekdayName,
 } from './calendar-math';
+import {
+  CreateCalendarEntryDto,
+  UpdateCalendarEntryDto,
+} from './dto/delivery-calendar.dto';
 
 @Injectable()
 export class DeliveryCalendarService {
@@ -16,6 +24,64 @@ export class DeliveryCalendarService {
       where: { isActive: true },
       orderBy: [{ areaName: 'asc' }, { deliveryDay: 'asc' }],
     });
+  }
+
+  listAdmin() {
+    return this.prisma.deliveryCalendar.findMany({
+      orderBy: [{ areaName: 'asc' }, { deliveryDay: 'asc' }],
+    });
+  }
+
+  async create(dto: CreateCalendarEntryDto) {
+    const areaName = dto.areaName.trim();
+    if (!areaName) {
+      throw new BadRequestException('areaName is required');
+    }
+    try {
+      return await this.prisma.deliveryCalendar.create({
+        data: {
+          areaName,
+          deliveryDay: dto.deliveryDay,
+          isActive: dto.isActive ?? true,
+        },
+      });
+    } catch (e) {
+      this.rethrowUnique(e);
+    }
+  }
+
+  async update(id: string, dto: UpdateCalendarEntryDto) {
+    await this.requireRow(id);
+    const data: Prisma.DeliveryCalendarUpdateInput = {};
+    if (dto.areaName !== undefined) {
+      const areaName = dto.areaName.trim();
+      if (!areaName) throw new BadRequestException('areaName is required');
+      data.areaName = areaName;
+    }
+    if (dto.deliveryDay !== undefined) data.deliveryDay = dto.deliveryDay;
+    if (dto.isActive !== undefined) data.isActive = dto.isActive;
+    try {
+      return await this.prisma.deliveryCalendar.update({
+        where: { id },
+        data,
+      });
+    } catch (e) {
+      this.rethrowUnique(e);
+    }
+  }
+
+  async setActive(id: string, isActive: boolean) {
+    await this.requireRow(id);
+    return this.prisma.deliveryCalendar.update({
+      where: { id },
+      data: { isActive },
+    });
+  }
+
+  async remove(id: string) {
+    await this.requireRow(id);
+    await this.prisma.deliveryCalendar.delete({ where: { id } });
+    return { deleted: true };
   }
 
   async resolveNextDeliveryDate(
@@ -53,5 +119,25 @@ export class DeliveryCalendarService {
       throw new NotFoundException('Could not resolve delivery date');
     }
     return best;
+  }
+
+  private async requireRow(id: string) {
+    const row = await this.prisma.deliveryCalendar.findUnique({
+      where: { id },
+    });
+    if (!row) throw new NotFoundException('Calendar entry not found');
+    return row;
+  }
+
+  private rethrowUnique(e: unknown): never {
+    if (
+      e instanceof Prisma.PrismaClientKnownRequestError &&
+      e.code === 'P2002'
+    ) {
+      throw new BadRequestException(
+        'That area already has this delivery day configured',
+      );
+    }
+    throw e;
   }
 }

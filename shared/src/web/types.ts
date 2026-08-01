@@ -9,6 +9,7 @@ export type AuthUser = {
   id: string;
   email: string;
   role: UserRole | string;
+  avatarUrl?: string | null;
 };
 
 export type AuthSession = {

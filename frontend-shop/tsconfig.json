@@ -16,7 +16,6 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
-    "baseUrl": ".",
     "paths": {
       "@halal-basket/web": ["../shared/src/web/index.ts"],
       "@halal-basket/web/*": ["../shared/src/web/*"]

@@ -22,7 +22,7 @@ export function SubcategoryGrid({
           <button
             type="button"
             onClick={() => onSelect(n.id)}
-            className="flex h-full w-full flex-col items-start gap-[var(--hb-icon-gap-lg)] rounded-[var(--hb-radius-lg)] border border-[rgba(26,92,58,0.12)] bg-white px-4 py-5 text-left transition hover:-translate-y-0.5 hover:border-[var(--hb-green)] hover:shadow-[var(--hb-shadow)] focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(47,143,91,0.28)]"
+            className="hb-icon-category-card flex h-full w-full flex-col items-start rounded-[var(--hb-radius-lg)] border border-[rgba(26,92,58,0.12)] bg-white text-left transition hover:-translate-y-0.5 hover:border-[var(--hb-green)] hover:shadow-[var(--hb-shadow)] focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(47,143,91,0.28)]"
           >
             <CategoryIconBadge id={n.id} size="md" />
             <span className="text-sm font-semibold leading-snug sm:text-base">

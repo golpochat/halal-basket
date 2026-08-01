@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  NotFoundException,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -131,6 +132,24 @@ export class AdminController {
       dto.reason,
       dto.amount,
     );
+  }
+
+  @Get('orders/:id')
+  @Roles(...OPS)
+  async getOrder(@Param('id', ParseUUIDPipe) id: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id },
+      include: {
+        customer: { include: { user: { select: { email: true } } } },
+        fulfillments: { include: { shop: true, driver: true } },
+        items: { include: { product: true } },
+        events: { orderBy: { createdAt: 'asc' }, take: 50 },
+      },
+    });
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+    return order;
   }
 
   @Post('orders/:id/complaint')

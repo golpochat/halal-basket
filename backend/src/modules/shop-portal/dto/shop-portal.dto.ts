@@ -3,6 +3,7 @@ import {
   IsNumber,
   IsOptional,
   IsUUID,
+  Min,
   ValidateIf,
 } from 'class-validator';
 import { FulfillmentStatus } from '@prisma/client';
@@ -26,6 +27,11 @@ export class UpdateShopProductDto {
   @IsOptional()
   @IsBoolean()
   isInStock?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  stockQuantity?: number;
 
   @IsOptional()
   @IsBoolean()

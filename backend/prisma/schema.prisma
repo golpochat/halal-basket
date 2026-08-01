@@ -75,12 +75,24 @@ enum Weekday {
   sunday
 }
 
+enum ShopKind {
+  shop
+  warehouse
+}
+
+enum StockHoldStatus {
+  active
+  consumed
+  released
+}
+
 model User {
   id                String    @id @default(uuid())
   email             String    @unique
   phone             String?   @unique
   passwordHash      String    @map("password_hash")
   role              UserRole
+  avatarUrl         String?   @map("avatar_url")
   isActive          Boolean   @default(true) @map("is_active")
   failedLoginCount  Int       @default(0) @map("failed_login_count")
   lockedUntil       DateTime? @map("locked_until")
@@ -102,9 +114,10 @@ model Customer {
   riskScore   Int      @default(0) @map("risk_score")
   isBlocked   Boolean  @default(false) @map("is_blocked")
 
-  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  orders   Order[]
-  feedback DriverFeedback[]
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders    Order[]
+  feedback  DriverFeedback[]
+  stockHolds StockHold[]
 
   @@map("customers")
 }
@@ -150,28 +163,31 @@ model Product {
   category     Category?     @relation(fields: [categoryId], references: [id])
   shopProducts ShopProduct[]
   orderItems   OrderItem[]
+  holdLines    StockHoldLine[]
 
   @@map("products")
 }
 
 model Shop {
-  id              String  @id @default(uuid())
+  id              String   @id @default(uuid())
   name            String
-  parentCompanyId String? @map("parent_company_id")
+  kind            ShopKind @default(shop)
+  parentCompanyId String?  @map("parent_company_id")
   address         String?
   phone           String?
   email           String?
-  openingHours    Json    @default("{}") @map("opening_hours")
-  deliveryZones   Json    @default("[]") @map("delivery_zones")
+  openingHours    Json     @default("{}") @map("opening_hours")
+  deliveryZones   Json     @default("[]") @map("delivery_zones")
   lat             Float?
   lng             Float?
-  isActive        Boolean @default(true) @map("is_active")
+  isActive        Boolean  @default(true) @map("is_active")
 
   shopUsers        ShopUser[]
   shopProducts     ShopProduct[]
   fulfillments     OrderFulfillment[]
   preferredOrders  Order[]            @relation("PreferredShop")
 
+  @@index([kind, isActive])
   @@map("shops")
 }
 
@@ -182,17 +198,52 @@ model ShopProduct {
   price             Decimal           @db.Decimal(10, 2)
   discountPrice     Decimal?          @map("discount_price") @db.Decimal(10, 2)
   isInStock         Boolean           @default(true) @map("is_in_stock")
+  /// Sellable units on hand. Soft holds reserve against this without decrementing until order.
+  stockQuantity     Int               @default(0) @map("stock_quantity")
   stockStatusSource StockStatusSource @default(shop) @map("stock_status_source")
   lastStockUpdateAt DateTime?         @map("last_stock_update_at")
   isVisible         Boolean           @default(true) @map("is_visible")
 
-  shop       Shop        @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  shop       Shop            @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  product    Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
   orderItems OrderItem[]
+  holdLines  StockHoldLine[]
 
   @@unique([shopId, productId])
   @@index([shopId, isInStock, isVisible])
   @@map("shop_products")
+}
+
+model StockHold {
+  id         String          @id @default(uuid())
+  customerId String          @map("customer_id")
+  status     StockHoldStatus @default(active)
+  expiresAt  DateTime        @map("expires_at")
+  createdAt  DateTime        @default(now()) @map("created_at")
+  updatedAt  DateTime        @updatedAt @map("updated_at")
+
+  customer Customer        @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  lines    StockHoldLine[]
+
+  @@index([customerId, status])
+  @@index([expiresAt])
+  @@map("stock_holds")
+}
+
+model StockHoldLine {
+  id            String @id @default(uuid())
+  holdId        String @map("hold_id")
+  shopProductId String @map("shop_product_id")
+  productId     String @map("product_id")
+  quantity      Int
+
+  hold        StockHold   @relation(fields: [holdId], references: [id], onDelete: Cascade)
+  shopProduct ShopProduct @relation(fields: [shopProductId], references: [id])
+  product     Product     @relation(fields: [productId], references: [id])
+
+  @@index([shopProductId])
+  @@index([holdId])
+  @@map("stock_hold_lines")
 }
 
 model Order {
@@ -200,7 +251,16 @@ model Order {
   customerId         String          @map("customer_id")
   fulfillmentMode    FulfillmentMode @map("fulfillment_mode")
   status             OrderStatus     @default(pending)
+  /// Line items total before discounts and HB delivery fee.
+  subtotalAmount     Decimal         @map("subtotal_amount") @db.Decimal(12, 2)
+  /// Coupon / promo discount applied to subtotal at order time.
+  discountAmount     Decimal         @default(0) @map("discount_amount") @db.Decimal(12, 2)
+  /// Platform delivery fee (0 for pickup). Set from PlatformSetting at order time.
+  deliveryFeeAmount  Decimal         @default(0) @map("delivery_fee_amount") @db.Decimal(12, 2)
+  /// Grand total = subtotalAmount - discountAmount + deliveryFeeAmount.
   totalAmount        Decimal         @map("total_amount") @db.Decimal(12, 2)
+  /// Applied coupon code when discountAmount > 0 (audit).
+  couponCode         String?         @map("coupon_code")
   deliveryAddress    Json?           @map("delivery_address")
   deliveryAreaName   String?         @map("delivery_area_name")
   preferredShopId    String?         @map("preferred_shop_id")
@@ -377,4 +437,18 @@ model PlatformSetting {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("platform_settings")
+}
+
+/// Admin-curated homepage / sidebar “Popular categories” (taxonomy root ids).
+/// Soft max 8 active; customer UI hides the section below 3.
+model FeaturedCategory {
+  id         String   @id @default(uuid())
+  categoryId String   @unique @map("category_id")
+  sortOrder  Int      @default(0) @map("sort_order")
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@index([isActive, sortOrder])
+  @@map("featured_categories")
 }

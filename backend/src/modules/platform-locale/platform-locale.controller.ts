@@ -7,6 +7,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Put,
   UseGuards,
 } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
@@ -17,8 +18,13 @@ import {
   CreateCurrencyDto,
   CreateLanguageDto,
   PublishDto,
+  PublishWarehouseDto,
   UpdateCurrencyDto,
+  UpdateDeliveryFeesDto,
   UpdateLanguageDto,
+  UpdatePromotionsDto,
+  UpsertWarehouseDto,
+  ValidateCouponDto,
 } from './dto/platform-locale.dto';
 import { PlatformLocaleService } from './platform-locale.service';
 
@@ -39,11 +45,78 @@ export class PlatformLocaleController {
     return this.locale.getBranding();
   }
 
+  /** Public: HB delivery fees + active calendar areas. */
+  @Get('platform/delivery-config')
+  getDeliveryConfig() {
+    return this.locale.getPublicDeliveryConfig();
+  }
+
+  /** Public: cart promo banner (no coupon list). */
+  @Get('platform/promotions')
+  getPromotions() {
+    return this.locale.getPublicPromotions();
+  }
+
+  /** Public: validate a coupon against current cart subtotal. */
+  @Post('platform/coupons/validate')
+  validateCoupon(@Body() dto: ValidateCouponDto) {
+    return this.locale.validateCoupon(dto);
+  }
+
   @Patch('admin/platform/branding')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(...PLATFORM)
   setBranding(@Body() body: { heroBackgroundUrl?: string }) {
     return this.locale.setBranding(body.heroBackgroundUrl ?? '');
+  }
+
+  @Get('admin/platform/delivery-fees')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(...PLATFORM)
+  getDeliveryFees() {
+    return this.locale.getDeliveryFees();
+  }
+
+  @Put('admin/platform/delivery-fees')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(...PLATFORM)
+  setDeliveryFees(@Body() dto: UpdateDeliveryFeesDto) {
+    return this.locale.setDeliveryFees(dto);
+  }
+
+  @Get('admin/platform/promotions')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(...PLATFORM)
+  getPromotionsAdmin() {
+    return this.locale.getPromotionsAdmin();
+  }
+
+  @Put('admin/platform/promotions')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(...PLATFORM)
+  setPromotions(@Body() dto: UpdatePromotionsDto) {
+    return this.locale.setPromotions(dto);
+  }
+
+  @Get('admin/platform/warehouse')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(...PLATFORM)
+  getWarehouse() {
+    return this.locale.getWarehouseAdmin();
+  }
+
+  @Put('admin/platform/warehouse')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(...PLATFORM)
+  upsertWarehouse(@Body() dto: UpsertWarehouseDto) {
+    return this.locale.upsertWarehouse(dto);
+  }
+
+  @Put('admin/platform/warehouse/publish')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(...PLATFORM)
+  publishWarehouse(@Body() dto: PublishWarehouseDto) {
+    return this.locale.setWarehousePublished(dto);
   }
 
   @Get('admin/currencies')

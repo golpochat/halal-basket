@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Get,
   Headers,
   Param,
   ParseUUIDPipe,
@@ -29,6 +30,12 @@ class ConfirmMockDto {
 @Controller('payments')
 export class PaymentsController {
   constructor(private readonly payments: PaymentsService) {}
+
+  /** Public: which provider the client should use. */
+  @Get('config')
+  config() {
+    return this.payments.getPublicConfig();
+  }
 
   @Post('orders/:orderId/intent')
   @UseGuards(JwtAuthGuard, RolesGuard)

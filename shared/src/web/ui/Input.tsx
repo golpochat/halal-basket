@@ -1,9 +1,12 @@
 import {
   forwardRef,
+  useCallback,
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
+  type CSSProperties,
   type InputHTMLAttributes,
   type ReactNode,
   type SelectHTMLAttributes,
@@ -21,6 +24,14 @@ const CONTROL_FOCUS =
   'focus-within:border-[var(--hb-leaf)] focus-within:shadow-[0_0_0_3px_rgba(47,143,91,0.2)]';
 const CONTROL_FOCUS_BTN =
   'focus-visible:border-[var(--hb-leaf)] focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(47,143,91,0.2)]';
+
+/** Shared dropdown panel surface — portaled to body to avoid clip/overlap */
+const DROPDOWN_PANEL =
+  `fixed z-[80] max-h-[min(16rem,calc(100dvh-5rem))] overflow-y-auto overscroll-contain bg-white py-1 shadow-[var(--hb-shadow-lg)] ${CONTROL_RADIUS} ${CONTROL_BORDER}`;
+
+const DROPDOWN_ROW = `flex w-full ${CONTROL_HEIGHT} shrink-0 items-center gap-2 whitespace-nowrap px-3 text-left text-sm font-semibold transition`;
+const DROPDOWN_ROW_IDLE = 'text-[var(--hb-ink)] hover:bg-[var(--hb-mist)]';
+const DROPDOWN_ROW_ACTIVE = 'bg-[var(--hb-mist)] text-[var(--hb-green)]';
 
 const fieldClass = `w-full ${CONTROL_HEIGHT} ${CONTROL_RADIUS} ${CONTROL_BORDER} bg-white px-3 text-sm font-semibold text-[var(--hb-ink)] transition focus:border-[var(--hb-leaf)] focus:outline-none focus:shadow-[0_0_0_3px_rgba(47,143,91,0.2)] disabled:opacity-55`;
 
@@ -77,7 +88,7 @@ export const SearchInput = forwardRef<
       ? `min-h-12 px-4 py-3 sm:min-h-14 sm:py-3.5`
       : `${CONTROL_HEIGHT} px-3`;
   const inputPad = size === 'lg' ? 'text-base sm:text-lg' : 'text-sm';
-  const iconSize = size === 'lg' ? ICON_SIZES.sm : 20;
+  const iconSize = size === 'lg' ? ICON_SIZES.md : ICON_SIZES.sm;
 
   return (
     <div
@@ -88,13 +99,84 @@ export const SearchInput = forwardRef<
       </span>
       <input
         ref={ref}
-        className={`min-w-0 flex-1 border-0 bg-transparent font-[inherit] font-semibold text-[inherit] outline-none placeholder:font-medium placeholder:text-[var(--hb-ink)]/40 disabled:opacity-55 ${inputPad}`}
+        className={`hb-search-input flex-1 font-[inherit] font-semibold text-[inherit] placeholder:font-medium placeholder:text-[var(--hb-ink)]/40 disabled:opacity-55 ${inputPad}`}
         type="search"
         {...props}
       />
     </div>
   );
 });
+
+type PanelPos = { top: number; left: number; width: number; minWidth: number };
+
+function useAnchoredPanel(
+  open: boolean,
+  triggerRef: React.RefObject<HTMLElement | null>,
+  opts?: { minWidth?: number; matchTriggerWidth?: boolean },
+) {
+  const [pos, setPos] = useState<PanelPos | null>(null);
+
+  const update = useCallback(() => {
+    const el = triggerRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const minWidth = opts?.minWidth ?? r.width;
+    const width = opts?.matchTriggerWidth === false ? minWidth : Math.max(r.width, minWidth);
+    let left = r.left;
+    const maxLeft = window.innerWidth - width - 8;
+    if (left > maxLeft) left = Math.max(8, maxLeft);
+    setPos({ top: r.bottom + 6, left, width, minWidth });
+  }, [triggerRef, opts?.minWidth, opts?.matchTriggerWidth]);
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setPos(null);
+      return;
+    }
+    update();
+    window.addEventListener('resize', update);
+    window.addEventListener('scroll', update, true);
+    return () => {
+      window.removeEventListener('resize', update);
+      window.removeEventListener('scroll', update, true);
+    };
+  }, [open, update]);
+
+  return pos;
+}
+
+function DropdownPortal({
+  open,
+  onClose,
+  label,
+  panelId,
+  style,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  label: string;
+  panelId: string;
+  style: CSSProperties | undefined;
+  children: ReactNode;
+}) {
+  if (!open || typeof document === 'undefined' || !style) return null;
+
+  return createPortal(
+    <>
+      <button
+        type="button"
+        className="fixed inset-0 z-[70] cursor-default bg-transparent"
+        aria-label={`Close ${label} menu`}
+        onClick={onClose}
+      />
+      <div id={panelId} className={DROPDOWN_PANEL} style={style} role="presentation">
+        {children}
+      </div>
+    </>,
+    document.body,
+  );
+}
 
 export type MenuOption = { value: string; label: string };
 
@@ -115,8 +197,8 @@ type MenuSelectProps = {
 };
 
 /**
- * Platform dropdown — fixed h-10 trigger, matching list row height,
- * same radius/border as SearchInput. Prefer this over native `<select>`.
+ * Platform dropdown — fixed h-10 trigger; panel portaled to body
+ * so sticky headers / overflow never clip or fight z-index.
  */
 export function MenuSelect({
   value,
@@ -134,35 +216,26 @@ export function MenuSelect({
   id,
 }: MenuSelectProps) {
   const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const listId = useId();
   const autoId = useId();
   const triggerId = id ?? autoId;
+  const pos = useAnchoredPanel(open, triggerRef, { matchTriggerWidth: true });
 
   useEffect(() => {
     if (!open) return;
-    function onDoc(e: MouseEvent) {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
-    }
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') setOpen(false);
     }
-    document.addEventListener('mousedown', onDoc);
     document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDoc);
-      document.removeEventListener('keydown', onKey);
-    };
+    return () => document.removeEventListener('keydown', onKey);
   }, [open]);
 
   const selected = options.find((o) => o.value === value);
   const display = selected?.label ?? placeholder;
 
   return (
-    <div
-      ref={rootRef}
-      className={`relative ${fullWidth ? 'w-full' : 'shrink-0'} ${className}`}
-    >
+    <div className={`relative ${fullWidth ? 'w-full' : 'shrink-0'} ${className}`}>
       {showLabel && (
         <label
           htmlFor={triggerId}
@@ -174,19 +247,8 @@ export function MenuSelect({
       )}
       {!showLabel && <span className="sr-only">{label}</span>}
 
-      {open &&
-        typeof document !== 'undefined' &&
-        createPortal(
-          <button
-            type="button"
-            className="fixed inset-0 z-[35] cursor-default bg-[rgba(19,38,28,0.28)]"
-            aria-label={`Close ${label} menu`}
-            onClick={() => setOpen(false)}
-          />,
-          document.body,
-        )}
-
       <button
+        ref={triggerRef}
         type="button"
         id={triggerId}
         disabled={disabled || options.length === 0}
@@ -195,11 +257,11 @@ export function MenuSelect({
         aria-controls={listId}
         aria-label={label}
         onClick={() => setOpen((v) => !v)}
-        className={`relative z-[45] flex ${CONTROL_HEIGHT} items-center gap-[var(--hb-icon-gap)] ${CONTROL_RADIUS} ${CONTROL_BORDER} ${CONTROL_FOCUS_BTN} bg-white px-3 text-sm font-semibold text-[var(--hb-ink)] shadow-[var(--hb-shadow-sm)] transition hover:border-[var(--hb-leaf)] disabled:opacity-55 ${fullWidth ? 'w-full justify-between' : ''} ${triggerClassName}`}
+        className={`flex ${CONTROL_HEIGHT} items-center gap-[var(--hb-icon-gap)] ${CONTROL_RADIUS} ${CONTROL_BORDER} ${CONTROL_FOCUS_BTN} bg-white px-3 text-sm font-semibold text-[var(--hb-ink)] shadow-[var(--hb-shadow-sm)] transition hover:border-[var(--hb-leaf)] disabled:opacity-55 ${fullWidth ? 'w-full justify-between' : ''} ${triggerClassName}`}
       >
         {leading && <span className="hb-icon-utility shrink-0">{leading}</span>}
         <span
-          className={`min-w-0 flex-1 truncate text-left ${!selected ? 'text-[var(--hb-ink)]/45' : ''}`}
+          className={`min-w-0 flex-1 truncate text-left whitespace-nowrap ${!selected ? 'text-[var(--hb-ink)]/45' : ''}`}
         >
           {display}
         </span>
@@ -210,21 +272,20 @@ export function MenuSelect({
         </span>
       </button>
 
-      {open && (
-        <ul
-          id={listId}
-          role="listbox"
-          aria-label={label}
-          className={`absolute z-[45] mt-1.5 max-h-60 overflow-auto bg-white py-1 shadow-[var(--hb-shadow-lg)] ${CONTROL_RADIUS} ${CONTROL_BORDER} ${
-            fullWidth ? 'inset-x-0' : 'left-0 min-w-full'
-          }`}
-        >
+      <DropdownPortal
+        open={open}
+        onClose={() => setOpen(false)}
+        label={label}
+        panelId={listId}
+        style={
+          pos
+            ? { top: pos.top, left: pos.left, width: pos.width, minWidth: pos.minWidth }
+            : undefined
+        }
+      >
+        <ul role="listbox" aria-label={label}>
           {options.length === 0 ? (
-            <li
-              className={`flex ${CONTROL_HEIGHT} items-center px-3 text-sm font-semibold text-[var(--hb-ink)]/50`}
-            >
-              No options
-            </li>
+            <li className={`${DROPDOWN_ROW} text-[var(--hb-ink)]/50`}>No options</li>
           ) : (
             options.map((opt) => {
               const isSelected = opt.value === value;
@@ -232,11 +293,7 @@ export function MenuSelect({
                 <li key={opt.value} role="option" aria-selected={isSelected}>
                   <button
                     type="button"
-                    className={`flex w-full ${CONTROL_HEIGHT} items-center px-3 text-left text-sm font-semibold transition ${
-                      isSelected
-                        ? 'bg-[var(--hb-mist)] text-[var(--hb-green)]'
-                        : 'text-[var(--hb-ink)] hover:bg-[var(--hb-mist)]'
-                    }`}
+                    className={`${DROPDOWN_ROW} ${isSelected ? DROPDOWN_ROW_ACTIVE : DROPDOWN_ROW_IDLE}`}
                     onClick={() => {
                       onChange(opt.value);
                       setOpen(false);
@@ -249,7 +306,7 @@ export function MenuSelect({
             })
           )}
         </ul>
-      )}
+      </DropdownPortal>
     </div>
   );
 }
@@ -276,8 +333,8 @@ function LocationActionIcon({ children }: { children: ReactNode }) {
 }
 
 /**
- * Area picker — pill trigger matches header chrome;
- * open menu follows Chaldal-style actions (locate / change city).
+ * Area picker — pill trigger; Chaldal-style locate / change-city menu.
+ * Panel is portaled so it never clips under the sticky header.
  */
 export function LocationSelect({
   value,
@@ -314,11 +371,15 @@ export function LocationSelect({
   const [open, setOpen] = useState(false);
   const [pickingCity, setPickingCity] = useState(false);
   const [locateMsg, setLocateMsg] = useState<string | null>(null);
-  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const listId = useId();
   const autoId = useId();
   const triggerId = id ?? autoId;
   const display = value || placeholder;
+  const pos = useAnchoredPanel(open, triggerRef, {
+    minWidth: 280,
+    matchTriggerWidth: false,
+  });
 
   useEffect(() => {
     if (!open) {
@@ -326,18 +387,11 @@ export function LocationSelect({
       setLocateMsg(null);
       return;
     }
-    function onDoc(e: MouseEvent) {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
-    }
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') setOpen(false);
     }
-    document.addEventListener('mousedown', onDoc);
     document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDoc);
-      document.removeEventListener('keydown', onKey);
-    };
+    return () => document.removeEventListener('keydown', onKey);
   }, [open]);
 
   function useCurrentLocation() {
@@ -349,10 +403,8 @@ export function LocationSelect({
     }
     navigator.geolocation.getCurrentPosition(
       () => {
-        // Areas are name-based in MVP; confirm current selection or open picker.
-        if (value) {
-          setOpen(false);
-        } else {
+        if (value) setOpen(false);
+        else {
           setPickingCity(true);
           setLocateMsg('Choose your delivery area');
         }
@@ -365,23 +417,15 @@ export function LocationSelect({
     );
   }
 
+  const actionRow =
+    'flex w-full shrink-0 items-center gap-3 whitespace-nowrap px-3 py-2.5 text-left text-sm font-semibold text-[var(--hb-ink)] transition hover:bg-[var(--hb-mist)] focus-visible:bg-[var(--hb-mist)] focus-visible:outline-none';
+
   return (
-    <div ref={rootRef} className={`relative shrink-0 ${className}`}>
+    <div className={`relative shrink-0 ${className}`}>
       <span className="sr-only">{label}</span>
 
-      {open &&
-        typeof document !== 'undefined' &&
-        createPortal(
-          <button
-            type="button"
-            className="fixed inset-0 z-[35] cursor-default bg-transparent"
-            aria-label={`Close ${label} menu`}
-            onClick={() => setOpen(false)}
-          />,
-          document.body,
-        )}
-
       <button
+        ref={triggerRef}
         type="button"
         id={triggerId}
         disabled={disabled || options.length === 0}
@@ -390,12 +434,14 @@ export function LocationSelect({
         aria-controls={listId}
         aria-label={label}
         onClick={() => setOpen((v) => !v)}
-        className={`relative z-[45] flex ${CONTROL_HEIGHT} max-w-[11rem] items-center gap-[var(--hb-icon-gap)] ${CONTROL_RADIUS} ${CONTROL_BORDER} ${CONTROL_FOCUS_BTN} bg-white px-3 text-sm font-semibold text-[var(--hb-green)] shadow-[var(--hb-shadow-sm)] transition hover:border-[var(--hb-leaf)] disabled:opacity-55`}
+        className={`flex ${CONTROL_HEIGHT} max-w-[11rem] items-center gap-[var(--hb-icon-gap)] ${CONTROL_RADIUS} ${CONTROL_BORDER} ${CONTROL_FOCUS_BTN} bg-white px-3 text-sm font-semibold text-[var(--hb-green)] shadow-[var(--hb-shadow-sm)] transition hover:border-[var(--hb-leaf)] disabled:opacity-55`}
       >
         <span className="hb-icon-utility shrink-0 text-[var(--hb-green)]">
-          {UtilityIcons.location({ size: 18 })}
+          {UtilityIcons.location({ size: ICON_SIZES.sm })}
         </span>
-        <span className="min-w-0 flex-1 truncate text-left">{display}</span>
+        <span className="min-w-0 flex-1 truncate whitespace-nowrap text-left">
+          {display}
+        </span>
         <span
           className={`hb-icon-utility shrink-0 text-[var(--hb-green)] transition-transform ${open ? 'rotate-180' : ''}`}
         >
@@ -403,90 +449,90 @@ export function LocationSelect({
         </span>
       </button>
 
-      {open && (
-        <div
-          id={listId}
-          role="menu"
-          aria-label={label}
-          className={`absolute left-0 z-[45] mt-1.5 min-w-[16.5rem] overflow-hidden bg-white py-1 shadow-[var(--hb-shadow-lg)] ${CONTROL_RADIUS} ${CONTROL_BORDER}`}
-        >
-          {!pickingCity ? (
-            <>
+      <DropdownPortal
+        open={open}
+        onClose={() => setOpen(false)}
+        label={label}
+        panelId={listId}
+        style={
+          pos
+            ? {
+                top: pos.top,
+                left: pos.left,
+                width: pos.width,
+                minWidth: pos.minWidth,
+              }
+            : undefined
+        }
+      >
+        {!pickingCity ? (
+          <div role="menu" aria-label={label}>
+            <button
+              type="button"
+              role="menuitem"
+              className={actionRow}
+              onClick={useCurrentLocation}
+            >
+              <LocationActionIcon>
+                {UtilityIcons.locate({ size: ICON_SIZES.sm })}
+              </LocationActionIcon>
+              <span className="whitespace-nowrap">Use my current location</span>
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              className={actionRow}
+              onClick={() => setPickingCity(true)}
+            >
+              <LocationActionIcon>
+                {UtilityIcons.location({ size: ICON_SIZES.sm })}
+              </LocationActionIcon>
+              <span className="whitespace-nowrap">Change city</span>
+            </button>
+          </div>
+        ) : (
+          <ul role="listbox" aria-label="Choose city">
+            <li>
               <button
                 type="button"
-                role="menuitem"
-                className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm font-medium text-[var(--hb-ink)] transition hover:bg-[var(--hb-mist)] focus-visible:bg-[var(--hb-mist)] focus-visible:outline-none"
-                onClick={useCurrentLocation}
+                className={`${DROPDOWN_ROW} ${DROPDOWN_ROW_IDLE} text-xs uppercase tracking-wide text-[var(--hb-ink)]/45`}
+                onClick={() => {
+                  setPickingCity(false);
+                  setLocateMsg(null);
+                }}
               >
-                <LocationActionIcon>
-                  {UtilityIcons.locate({ size: 18 })}
-                </LocationActionIcon>
-                Use my current location
+                {UtilityIcons.chevronDown({ size: 14, className: 'rotate-90' })}
+                Back
               </button>
-              <button
-                type="button"
-                role="menuitem"
-                className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm font-medium text-[var(--hb-ink)] transition hover:bg-[var(--hb-mist)] focus-visible:bg-[var(--hb-mist)] focus-visible:outline-none"
-                onClick={() => setPickingCity(true)}
-              >
-                <LocationActionIcon>
-                  {UtilityIcons.location({ size: 18 })}
-                </LocationActionIcon>
-                Change city
-              </button>
-            </>
-          ) : (
-            <ul role="listbox" aria-label="Choose city" className="max-h-60 overflow-auto py-1">
-              <li>
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-[var(--hb-ink)]/45 hover:bg-[var(--hb-mist)]"
-                  onClick={() => {
-                    setPickingCity(false);
-                    setLocateMsg(null);
-                  }}
-                >
-                  {UtilityIcons.chevronDown({
-                    size: 14,
-                    className: 'rotate-90',
-                  })}
-                  Back
-                </button>
+            </li>
+            {locateMsg && (
+              <li className="px-3 pb-2 text-xs font-medium text-[var(--hb-ink)]/55">
+                {locateMsg}
               </li>
-              {locateMsg && (
-                <li className="px-3 pb-1 text-xs text-[var(--hb-ink)]/55">
-                  {locateMsg}
+            )}
+            {options.map((opt) => {
+              const isSelected = opt === value;
+              return (
+                <li key={opt} role="option" aria-selected={isSelected}>
+                  <button
+                    type="button"
+                    className={`${DROPDOWN_ROW} ${isSelected ? DROPDOWN_ROW_ACTIVE : DROPDOWN_ROW_IDLE}`}
+                    onClick={() => {
+                      onChange(opt);
+                      setOpen(false);
+                    }}
+                  >
+                    <span className="hb-icon-utility text-[var(--hb-green)]">
+                      {UtilityIcons.location({ size: 16 })}
+                    </span>
+                    <span className="truncate">{opt}</span>
+                  </button>
                 </li>
-              )}
-              {options.map((opt) => {
-                const isSelected = opt === value;
-                return (
-                  <li key={opt} role="option" aria-selected={isSelected}>
-                    <button
-                      type="button"
-                      className={`flex w-full ${CONTROL_HEIGHT} items-center gap-2 px-3 text-left text-sm font-semibold transition ${
-                        isSelected
-                          ? 'bg-[var(--hb-mist)] text-[var(--hb-green)]'
-                          : 'text-[var(--hb-ink)] hover:bg-[var(--hb-mist)]'
-                      }`}
-                      onClick={() => {
-                        onChange(opt);
-                        setOpen(false);
-                      }}
-                    >
-                      <span className="hb-icon-utility text-[var(--hb-green)]">
-                        {UtilityIcons.location({ size: 16 })}
-                      </span>
-                      <span className="truncate">{opt}</span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
-      )}
+              );
+            })}
+          </ul>
+        )}
+      </DropdownPortal>
     </div>
   );
 }
-

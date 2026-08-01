@@ -6,6 +6,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { OrdersService } from '../orders/orders.service';
+import { StockService } from '../stock/stock.service';
 import { UpdateShopProductDto } from './dto/shop-portal.dto';
 
 @Injectable()
@@ -13,6 +14,7 @@ export class ShopPortalService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly orders: OrdersService,
+    private readonly stock: StockService,
   ) {}
 
   async resolveShopIds(userId: string, _role: string): Promise<string[]> {
@@ -110,6 +112,13 @@ export class ShopPortalService {
       throw new ForbiddenException('Product not in your shops');
     }
 
+    const stockPatch = this.stock.resolveStockPatch({
+      currentQty: sp.stockQuantity,
+      currentInStock: sp.isInStock,
+      stockQuantity: dto.stockQuantity,
+      isInStock: dto.isInStock,
+    });
+
     return this.prisma.shopProduct.update({
       where: { id: shopProductId },
       data: {
@@ -121,7 +130,8 @@ export class ShopPortalService {
             : dto.discountPrice === null
               ? null
               : new Prisma.Decimal(dto.discountPrice),
-        isInStock: dto.isInStock,
+        isInStock: stockPatch.isInStock,
+        stockQuantity: stockPatch.stockQuantity,
         isVisible: dto.isVisible,
         stockStatusSource: 'shop',
         lastStockUpdateAt: new Date(),

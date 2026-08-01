@@ -6,23 +6,47 @@ export type CartLine = {
   quantity: number;
   name: string;
   price: number;
-  shopId: string;
+  shopId?: string;
   shopName?: string;
+  imageUrl?: string | null;
+};
+
+export type CouponRule = {
+  type: 'percent' | 'fixed';
+  value: number;
 };
 
 type CartState = {
   shopId: string;
   lines: CartLine[];
   cartOpen: boolean;
+  couponCode: string;
+  couponApplied: string | null;
+  couponRule: CouponRule | null;
   setShopId: (id: string) => void;
   setCartOpen: (open: boolean) => void;
+  setCouponCode: (code: string) => void;
+  /** Persist a server-validated coupon rule for live discount math. */
+  setAppliedCoupon: (code: string, rule: CouponRule) => void;
+  clearCoupon: () => void;
   add: (line: Omit<CartLine, 'quantity'> & { quantity?: number }) => void;
   setQty: (productId: string, quantity: number) => void;
   clear: () => void;
+  removeUnavailable: (productIds: string[]) => void;
   getQty: (productId: string) => number;
   count: () => number;
+  subtotal: () => number;
+  discount: () => number;
   total: () => number;
 };
+
+function computeDiscount(sub: number, rule: CouponRule | null): number {
+  if (!rule) return 0;
+  if (rule.type === 'percent') {
+    return Math.round(sub * (rule.value / 100) * 100) / 100;
+  }
+  return Math.min(rule.value, sub);
+}
 
 export const useCartStore = create<CartState>()(
   persist(
@@ -30,8 +54,20 @@ export const useCartStore = create<CartState>()(
       shopId: '',
       lines: [],
       cartOpen: false,
-      setShopId: (id) => set({ shopId: id, lines: [] }),
+      couponCode: '',
+      couponApplied: null,
+      couponRule: null,
+      setShopId: (id) => set({ shopId: id }),
       setCartOpen: (open) => set({ cartOpen: open }),
+      setCouponCode: (couponCode) => set({ couponCode }),
+      setAppliedCoupon: (code, rule) =>
+        set({
+          couponApplied: code,
+          couponCode: code,
+          couponRule: rule,
+        }),
+      clearCoupon: () =>
+        set({ couponApplied: null, couponCode: '', couponRule: null }),
       add: (line) => {
         const qty = line.quantity ?? 1;
         set((state) => {
@@ -40,7 +76,11 @@ export const useCartStore = create<CartState>()(
             return {
               lines: state.lines.map((l) =>
                 l.productId === line.productId
-                  ? { ...l, quantity: l.quantity + qty }
+                  ? {
+                      ...l,
+                      quantity: l.quantity + qty,
+                      imageUrl: l.imageUrl ?? line.imageUrl,
+                    }
                   : l,
               ),
             };
@@ -60,15 +100,39 @@ export const useCartStore = create<CartState>()(
                 ),
         }));
       },
-      clear: () => set({ lines: [] }),
+      clear: () =>
+        set({
+          lines: [],
+          couponApplied: null,
+          couponCode: '',
+          couponRule: null,
+        }),
+      removeUnavailable: (productIds) => {
+        const ban = new Set(productIds);
+        set((state) => ({
+          lines: state.lines.filter((l) => !ban.has(l.productId)),
+        }));
+      },
       getQty: (productId) =>
         get().lines.find((l) => l.productId === productId)?.quantity ?? 0,
       count: () => get().lines.reduce((a, l) => a + l.quantity, 0),
-      total: () => get().lines.reduce((a, l) => a + l.price * l.quantity, 0),
+      subtotal: () =>
+        get().lines.reduce((a, l) => a + l.price * l.quantity, 0),
+      discount: () => computeDiscount(get().subtotal(), get().couponRule),
+      total: () => {
+        const t = get().subtotal() - get().discount();
+        return t < 0 ? 0 : Math.round(t * 100) / 100;
+      },
     }),
     {
       name: 'hb_cart',
-      partialize: (s) => ({ shopId: s.shopId, lines: s.lines }),
+      partialize: (s) => ({
+        shopId: s.shopId,
+        lines: s.lines,
+        couponApplied: s.couponApplied,
+        couponCode: s.couponCode,
+        couponRule: s.couponRule,
+      }),
     },
   ),
 );

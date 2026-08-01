@@ -26,7 +26,7 @@ export function ProductCard({
   const { formatMoney } = useLocale();
 
   return (
-    <article className="hb-surface group flex flex-col overflow-hidden p-0 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+    <article className="hb-surface hb-product-lift group flex flex-col overflow-hidden p-0 shadow-sm">
       <div className="relative aspect-[4/3] overflow-hidden bg-[var(--hb-mist)]">
         {product.imageUrl ? (
           <img

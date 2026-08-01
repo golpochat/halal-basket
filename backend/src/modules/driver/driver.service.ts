@@ -37,14 +37,14 @@ export class DriverService {
     return this.prisma.orderFulfillment.findMany({
       where: {
         driverId: driver.id,
+        status: {
+          notIn: [FulfillmentStatus.delivered, FulfillmentStatus.cancelled],
+        },
         OR: [
-          { deliveryDate: day },
+          { deliveryDate: { gte: day } },
           {
             deliveryDate: null,
-            order: {
-              fulfillmentMode: 'pickup',
-              createdAt: { gte: day },
-            },
+            order: { fulfillmentMode: 'pickup' },
           },
         ],
       },
@@ -53,7 +53,7 @@ export class DriverService {
         shop: true,
         items: { include: { product: true } },
       },
-      orderBy: { id: 'asc' },
+      orderBy: [{ deliveryDate: 'asc' }, { id: 'asc' }],
     });
   }
 

@@ -1,7 +1,6 @@
-import { useEffect, useState } from 'react';
-import { RequireAuth, RequireRole } from '../../auth/guards';
+import { useEffect, useMemo, useState } from 'react';
+import { ICON_SIZES, UtilityIcons } from '@halal-basket/web';
 import { useAuth } from '../../auth/AuthContext';
-import { AppShell } from '../../components/ui/AppShell';
 import { api } from '../../lib/api';
 
 type Driver = { id: string; name: string; phone: string | null };
@@ -23,24 +22,9 @@ const STATUSES = [
   'cancelled',
 ] as const;
 
-const shopNav = [
-  { to: '/', label: 'Dashboard', end: true },
-  { to: '/orders', label: 'Orders' },
-  { to: '/prep', label: 'Scheduled prep' },
-  { to: '/products', label: 'Products' },
-];
+const PAGE_SIZE = 10;
 
 export function ShopOrdersPage() {
-  return (
-    <RequireAuth>
-      <RequireRole roles={['shop']}>
-        <OrdersInner />
-      </RequireRole>
-    </RequireAuth>
-  );
-}
-
-function OrdersInner() {
   const { session } = useAuth();
   const token = session!.accessToken;
   const [orders, setOrders] = useState<Fulfillment[]>([]);
@@ -50,6 +34,7 @@ function OrdersInner() {
   );
   const [error, setError] = useState('');
   const [msg, setMsg] = useState('');
+  const [page, setPage] = useState(1);
 
   async function refresh() {
     const [o, d] = await Promise.all([
@@ -63,6 +48,17 @@ function OrdersInner() {
   useEffect(() => {
     refresh().catch((e) => setError(e.message));
   }, [token]);
+
+  const totalPages = Math.max(1, Math.ceil(orders.length / PAGE_SIZE));
+  const pageSafe = Math.min(page, totalPages);
+  const pageRows = useMemo(() => {
+    const start = (pageSafe - 1) * PAGE_SIZE;
+    return orders.slice(start, start + PAGE_SIZE);
+  }, [orders, pageSafe]);
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
 
   async function setStatus(id: string, status: string) {
     setError('');
@@ -100,7 +96,22 @@ function OrdersInner() {
   }
 
   return (
-    <AppShell title="Orders" nav={shopNav} homeTo="/">
+    <div>
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+        <p className="text-sm text-[var(--hb-ink)]/55">
+          {orders.length} total · {PAGE_SIZE} per page
+        </p>
+        <button
+          type="button"
+          className="hb-icon-btn"
+          aria-label="Refresh orders"
+          title="Refresh"
+          onClick={() => refresh().catch((e) => setError(e.message))}
+        >
+          {UtilityIcons.refresh({ size: ICON_SIZES.sm })}
+        </button>
+      </div>
+
       {error && (
         <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
           {error}
@@ -111,66 +122,118 @@ function OrdersInner() {
           {msg}
         </p>
       )}
-      <div className="space-y-3">
-        {orders.map((f) => (
-          <article key={f.id} className="hb-surface p-4 shadow-sm">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <p className="font-semibold">
-                  {f.order.customer?.name ?? 'Customer'} · {f.status}
-                </p>
-                <p className="text-xs text-[var(--hb-ink)]/50">
+
+      <div className="hb-data-table-wrap">
+        <table className="hb-data-table">
+          <thead>
+            <tr>
+              <th>Customer</th>
+              <th>Status</th>
+              <th>Mode</th>
+              <th>Delivery</th>
+              <th>Driver</th>
+              <th style={{ textAlign: 'right' }}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pageRows.map((f) => (
+              <tr key={f.id}>
+                <td className="font-semibold">
+                  {f.order.customer?.name ?? 'Customer'}
+                </td>
+                <td>{f.status.replaceAll('_', ' ')}</td>
+                <td className="text-[var(--hb-ink)]/65">
                   {f.order.fulfillmentMode.replaceAll('_', ' ')}
+                </td>
+                <td className="text-[var(--hb-ink)]/65">
                   {f.deliveryDate
-                    ? ` · ${new Date(f.deliveryDate).toLocaleDateString()}`
-                    : ''}
-                  {f.driver?.name
-                    ? ` · ${f.driver.name}`
-                    : f.driverId
-                      ? ' · driver assigned'
-                      : ' · no driver'}
-                </p>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <select
-                  className="hb-input w-auto py-2 text-sm"
-                  value={f.status}
-                  onChange={(e) => setStatus(f.id, e.target.value)}
-                >
-                  {STATUSES.map((s) => (
-                    <option key={s} value={s}>
-                      {s.replaceAll('_', ' ')}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  className="hb-input w-auto min-w-[10rem] py-2 text-sm"
-                  value={selectedDriver[f.id] ?? drivers[0]?.id ?? ''}
-                  onChange={(e) =>
-                    setSelectedDriver((m) => ({ ...m, [f.id]: e.target.value }))
-                  }
-                >
-                  {drivers.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  className="hb-btn hb-btn-ghost py-2 text-sm"
-                  onClick={() => assign(f.id)}
-                >
-                  Assign driver
-                </button>
-              </div>
-            </div>
-          </article>
-        ))}
-        {orders.length === 0 && (
-          <p className="text-[var(--hb-ink)]/55">No orders yet.</p>
-        )}
+                    ? new Date(f.deliveryDate).toLocaleDateString()
+                    : '—'}
+                </td>
+                <td className="text-[var(--hb-ink)]/65">
+                  {f.driver?.name ??
+                    (f.driverId ? 'Assigned' : 'Unassigned')}
+                </td>
+                <td>
+                  <div className="hb-data-table__actions">
+                    <select
+                      className="hb-input w-auto py-1.5 text-xs"
+                      value={f.status}
+                      onChange={(e) => setStatus(f.id, e.target.value)}
+                      aria-label={`Status for ${f.order.customer?.name ?? 'order'}`}
+                    >
+                      {STATUSES.map((s) => (
+                        <option key={s} value={s}>
+                          {s.replaceAll('_', ' ')}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      className="hb-input w-auto min-w-[7rem] py-1.5 text-xs"
+                      value={selectedDriver[f.id] ?? drivers[0]?.id ?? ''}
+                      onChange={(e) =>
+                        setSelectedDriver((m) => ({
+                          ...m,
+                          [f.id]: e.target.value,
+                        }))
+                      }
+                      aria-label={`Driver for ${f.order.customer?.name ?? 'order'}`}
+                    >
+                      {drivers.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      className="hb-icon-btn hb-icon-btn--primary"
+                      aria-label={`Assign driver for ${f.order.customer?.name ?? 'order'}`}
+                      title="Assign driver"
+                      onClick={() => assign(f.id)}
+                    >
+                      {UtilityIcons.locate({ size: ICON_SIZES.sm })}
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {pageRows.length === 0 && (
+              <tr>
+                <td colSpan={6} className="text-[var(--hb-ink)]/55">
+                  No orders yet.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
-    </AppShell>
+
+      <div className="hb-pagination">
+        <span>
+          Page {pageSafe} of {totalPages}
+        </span>
+        <div className="hb-pagination__controls">
+          <button
+            type="button"
+            className="hb-icon-btn"
+            aria-label="Previous page"
+            disabled={pageSafe <= 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+          >
+            {UtilityIcons.chevronLeft({ size: ICON_SIZES.sm })}
+          </button>
+          <button
+            type="button"
+            className="hb-icon-btn"
+            aria-label="Next page"
+            disabled={pageSafe >= totalPages}
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+          >
+            {UtilityIcons.chevronRight({ size: ICON_SIZES.sm })}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

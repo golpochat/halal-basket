@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
-import { Badge, HalalBadge, PartnerBadge } from './Badge';
+import { HalalBadge, PartnerBadge } from './Badge';
 import { Button } from './Button';
 import { ProductImage } from './ProductImage';
+import { StockDotIcon } from '../../../icons';
 import type { StockLevel } from '../types';
 
 export type ProductCardData = {
@@ -18,12 +19,30 @@ export type ProductCardData = {
 function stockLabel(stock: StockLevel) {
   switch (stock) {
     case 'in_stock':
-      return { text: 'In stock', tone: 'green' as const };
+      return 'In stock';
     case 'low_stock':
-      return { text: 'Low stock', tone: 'warning' as const };
+      return 'Low stock';
     default:
-      return { text: 'Out of stock', tone: 'danger' as const };
+      return 'Out of stock';
   }
+}
+
+function StockStatus({ stock }: { stock: StockLevel }) {
+  const label = stockLabel(stock);
+  const color =
+    stock === 'in_stock'
+      ? 'text-[var(--hb-icon-brand-soft)]'
+      : stock === 'low_stock'
+        ? 'text-[var(--hb-icon-brand-accent)]'
+        : 'text-[var(--hb-icon-brand-muted)]';
+  return (
+    <span
+      className={`inline-flex items-center gap-2 text-xs font-semibold ${color}`}
+    >
+      <StockDotIcon stock={stock} size={8} title={label} />
+      {label}
+    </span>
+  );
 }
 
 export function ProductCard({
@@ -41,14 +60,28 @@ export function ProductCard({
   formatMoney: (n: number) => string;
   layout?: 'grid' | 'list';
 }) {
-  const stock = stockLabel(product.stock);
-  const canAdd = product.stock !== 'out_of_stock';
+  const outOfStock = product.stock === 'out_of_stock';
+  const canAdd = !outOfStock;
+
+  const oosLabel = outOfStock ? (
+    <div className="hb-product-card__oos-label" aria-hidden>
+      <span>Out of stock</span>
+    </div>
+  ) : null;
 
   if (layout === 'list') {
     return (
-      <article className="hb-surface flex gap-4 overflow-hidden p-3 shadow-[var(--hb-shadow-sm)] transition hover:shadow-[var(--hb-shadow)] sm:p-4">
-        <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-[var(--hb-radius)] sm:h-28 sm:w-28">
+      <article
+        className={`hb-surface flex gap-4 overflow-hidden p-3 shadow-[var(--hb-shadow-sm)] transition sm:p-4 ${
+          outOfStock
+            ? 'hb-product-card--oos'
+            : 'hover:shadow-[var(--hb-shadow)]'
+        }`}
+        aria-disabled={outOfStock || undefined}
+      >
+        <div className="hb-product-card__media relative h-24 w-24 shrink-0 overflow-hidden rounded-[var(--hb-radius)] sm:h-28 sm:w-28">
           <ProductImage src={product.imageUrl} alt={product.name} size="sm" />
+          {oosLabel}
         </div>
         <div className="flex min-w-0 flex-1 flex-col sm:flex-row sm:items-center sm:justify-between sm:gap-4">
           <div className="min-w-0">
@@ -62,7 +95,7 @@ export function ProductCard({
               <p className="font-display text-xl font-semibold">
                 {formatMoney(product.price)}
               </p>
-              <Badge tone={stock.tone}>{stock.text}</Badge>
+              <StockStatus stock={product.stock} />
               {product.verifiedHalal && <HalalBadge />}
             </div>
           </div>
@@ -101,10 +134,16 @@ export function ProductCard({
   }
 
   return (
-    <article className="hb-surface group flex flex-col overflow-hidden p-0 shadow-[var(--hb-shadow-sm)] transition hover:-translate-y-0.5 hover:shadow-[var(--hb-shadow)]">
-      <div className="relative aspect-[4/3] overflow-hidden">
+    <article
+      className={`hb-surface hb-product-lift group flex flex-col overflow-hidden p-0 shadow-[var(--hb-shadow-sm)] ${
+        outOfStock ? 'hb-product-card--oos' : ''
+      }`}
+      aria-disabled={outOfStock || undefined}
+    >
+      <div className="hb-product-card__media relative aspect-[4/3] overflow-hidden">
         <ProductImage src={product.imageUrl} alt={product.name} size="md" />
-        <div className="absolute left-2 top-2 flex flex-wrap gap-1">
+        {oosLabel}
+        <div className="hb-product-card__badges">
           {product.verifiedHalal && <HalalBadge />}
           {product.shopPartner && <PartnerBadge />}
         </div>
@@ -123,7 +162,7 @@ export function ProductCard({
               {formatMoney(product.price)}
             </p>
             <p className="mt-1">
-              <Badge tone={stock.tone}>{stock.text}</Badge>
+              <StockStatus stock={product.stock} />
             </p>
           </div>
           {!canAdd ? null : qty > 0 ? (

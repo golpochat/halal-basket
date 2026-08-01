@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { BadgeHalalIcon, BadgePartnerIcon } from '../icons/brand';
+import { BadgeHalalIcon, BadgePartnerIcon, ICON_SIZES } from '../../../icons';
 
 export function InfoCard({
   children,
@@ -34,7 +34,7 @@ export function Badge({
   };
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold ${tones[tone]}`}
+      className={`inline-flex items-center gap-2 rounded-md px-2 py-0.5 text-xs font-semibold ${tones[tone]}`}
     >
       {icon}
       {children}
@@ -44,7 +44,7 @@ export function Badge({
 
 export function HalalBadge() {
   return (
-    <Badge tone="gold" icon={<BadgeHalalIcon size={14} />}>
+    <Badge tone="gold" icon={<BadgeHalalIcon size={ICON_SIZES.badge} />}>
       Halal
     </Badge>
   );
@@ -52,7 +52,7 @@ export function HalalBadge() {
 
 export function PartnerBadge() {
   return (
-    <Badge tone="green" icon={<BadgePartnerIcon size={14} />}>
+    <Badge tone="green" icon={<BadgePartnerIcon size={ICON_SIZES.badge} />}>
       Partner
     </Badge>
   );

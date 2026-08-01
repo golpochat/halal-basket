@@ -6,7 +6,13 @@ import { SiteFooter } from '../components/layout/SiteFooter';
 import { LocalePickers } from '../components/LocalePickers';
 import { useAuth } from '../auth/AuthContext';
 import { GuestOnly } from '../auth/guards';
-import { api, AuthSession, homeForRole } from '../lib/api';
+import {
+  api,
+  AuthSession,
+  authHandoffUrl,
+  homeForRole,
+  isExternalHome,
+} from '../lib/api';
 
 export function LoginPage() {
   return (
@@ -34,15 +40,21 @@ function LoginForm() {
         method: 'POST',
         body: JSON.stringify({ email, password }),
       });
-      setSession(result);
       const next = params.get('next');
-      if (next && next.startsWith('/')) {
-        navigate(next);
-      } else {
-        navigate(homeForRole(result.user.role));
+      const dest =
+        next && next.startsWith('/')
+          ? next
+          : homeForRole(result.user.role);
+
+      if (isExternalHome(dest)) {
+        window.location.assign(authHandoffUrl(dest, result));
+        return;
       }
+
+      setSession(result);
+      navigate(dest);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Sign-in failed');
+      setError(err instanceof Error ? err.message : 'Could not sign in');
     } finally {
       setLoading(false);
     }
@@ -69,7 +81,7 @@ function LoginForm() {
                 to="/register"
                 className="font-medium text-[var(--hb-green)] underline"
               >
-                create an account
+                Sign up
               </Link>
               .
             </p>

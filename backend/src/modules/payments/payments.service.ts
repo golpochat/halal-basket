@@ -22,6 +22,24 @@ export class PaymentsService {
     return p === 'stripe' ? 'stripe' : 'mock';
   }
 
+  getPublicConfig() {
+    return {
+      provider: this.provider(),
+      publishableKey:
+        this.provider() === 'stripe'
+          ? (this.config.get<string>('STRIPE_PUBLISHABLE_KEY') ?? null)
+          : null,
+    };
+  }
+
+  private frontendBase() {
+    return (
+      this.config.get<string>('FRONTEND_URL')?.replace(/\/$/, '') ||
+      this.config.get<string>('CORS_ORIGINS')?.split(',')[0]?.trim() ||
+      'http://localhost:5173'
+    );
+  }
+
   async createIntent(orderId: string, actorUserId: string) {
     const order = await this.prisma.order.findUnique({ where: { id: orderId } });
     if (!order) throw new NotFoundException('Order not found');
@@ -37,23 +55,55 @@ export class PaymentsService {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const Stripe = require('stripe');
       const stripe = new Stripe(key);
-      const intent = await stripe.paymentIntents.create({
-        amount: Math.round(Number(order.totalAmount) * 100),
-        currency: 'eur',
+      const base = this.frontendBase();
+      const amountCents = Math.round(Number(order.totalAmount) * 100);
+      if (amountCents < 50) {
+        throw new BadRequestException('Order total too low for Stripe Checkout');
+      }
+
+      const session = await stripe.checkout.sessions.create({
+        mode: 'payment',
+        success_url: `${base}/orders/${order.id}/confirmation?paid=1`,
+        cancel_url: `${base}/orders/${order.id}/confirmation?paid=0`,
+        line_items: [
+          {
+            quantity: 1,
+            price_data: {
+              currency: 'eur',
+              unit_amount: amountCents,
+              product_data: {
+                name: 'Halal Basket order',
+                description: `Order ${order.id.slice(0, 8)}…`,
+              },
+            },
+          },
+        ],
         metadata: { orderId: order.id },
-        automatic_payment_methods: { enabled: true },
+        payment_intent_data: {
+          metadata: { orderId: order.id },
+        },
       });
+
+      if (!session.url) {
+        throw new BadRequestException('Stripe Checkout session missing URL');
+      }
+
       await this.audit.log({
         actorUserId,
-        action: 'payment.intent_created',
+        action: 'payment.checkout_session_created',
         entityType: 'order',
         entityId: orderId,
-        payload: { provider: 'stripe', paymentIntentId: intent.id },
+        payload: {
+          provider: 'stripe',
+          sessionId: session.id,
+          paymentIntentId: session.payment_intent ?? null,
+        },
       });
+
       return {
         provider: 'stripe' as const,
-        clientSecret: intent.client_secret,
-        paymentIntentId: intent.id,
+        checkoutUrl: session.url,
+        sessionId: session.id,
         amount: Number(order.totalAmount),
         currency: 'eur',
       };
@@ -94,6 +144,9 @@ export class PaymentsService {
   ) {
     const order = await this.prisma.order.findUnique({ where: { id: orderId } });
     if (!order) throw new NotFoundException('Order not found');
+    if (order.paymentStatus === PaymentStatus.paid) {
+      return order;
+    }
 
     const updated = await this.prisma.order.update({
       where: { id: orderId },
@@ -121,6 +174,21 @@ export class PaymentsService {
     const Stripe = require('stripe');
     const stripe = new Stripe(key);
     const event = stripe.webhooks.constructEvent(rawBody, signature ?? '', secret);
+
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object as {
+        id: string;
+        payment_intent?: string | null;
+        metadata?: { orderId?: string };
+      };
+      const orderId = session.metadata?.orderId;
+      if (orderId) {
+        await this.markPaid(orderId, undefined, {
+          provider: 'stripe',
+          paymentIntentId: String(session.payment_intent ?? session.id),
+        });
+      }
+    }
 
     if (event.type === 'payment_intent.succeeded') {
       const intent = event.data.object as {

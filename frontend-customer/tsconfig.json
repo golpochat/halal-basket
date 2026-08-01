@@ -18,8 +18,9 @@
     "noUncheckedSideEffectImports": true,
     "paths": {
       "@halal-basket/web": ["../shared/src/web/index.ts"],
-      "@halal-basket/web/*": ["../shared/src/web/*"]
+      "@halal-basket/web/*": ["../shared/src/web/*"],
+      "@halal-basket/icons": ["../shared/icons/index.ts"]
     }
   },
-  "include": ["src", "../shared/src/web"]
+  "include": ["src", "../shared/src/web", "../shared/icons"]
 }

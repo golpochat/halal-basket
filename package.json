@@ -6,6 +6,7 @@
     "frontend-customer",
     "frontend-shop",
     "frontend-driver",
+    "frontend-admin",
     "shared"
   ],
   "scripts": {
@@ -14,7 +15,8 @@
     "dev:customer": "npm run dev -w frontend-customer",
     "dev:shop": "npm run dev -w frontend-shop",
     "dev:driver": "npm run dev -w frontend-driver",
-    "build": "npm run build -w shared && npm run build -w backend && npm run build -w frontend-customer && npm run build -w frontend-shop && npm run build -w frontend-driver",
+    "dev:admin": "npm run dev -w frontend-admin",
+    "build": "npm run build -w shared && npm run build -w backend && npm run build -w frontend-customer && npm run build -w frontend-shop && npm run build -w frontend-driver && npm run build -w frontend-admin",
     "db:migrate": "npm run prisma:migrate -w backend",
     "db:seed": "npm run prisma:seed -w backend",
     "db:generate": "npm run prisma:generate -w backend"

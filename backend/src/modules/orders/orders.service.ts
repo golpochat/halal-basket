@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -12,6 +13,8 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RoutingEngineService } from '../routing-engine/routing-engine.service';
+import { PlatformLocaleService } from '../platform-locale/platform-locale.service';
+import { StockService } from '../stock/stock.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { MetricsService } from '../../common/metrics.service';
 
@@ -20,6 +23,8 @@ export class OrdersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly routing: RoutingEngineService,
+    private readonly platform: PlatformLocaleService,
+    private readonly stock: StockService,
     private readonly metrics: MetricsService,
   ) {}
 
@@ -40,6 +45,7 @@ export class OrdersService {
       deliveryAreaName: dto.deliveryAreaName,
       deliveryAddress: dto.deliveryAddress,
       customerRiskScore: customer.riskScore,
+      customerId: customer.id,
       items: dto.items.map((i) => ({
         productId: i.productId,
         quantity: i.quantity,
@@ -50,7 +56,9 @@ export class OrdersService {
       throw err;
     });
 
-    const totalAmount = route.fulfillments
+    const expectedLines = this.stock.flattenRouteLines(route.fulfillments);
+
+    const subtotalAmount = route.fulfillments
       .flatMap((f) => f.linePricings)
       .reduce(
         (sum, line) =>
@@ -58,13 +66,54 @@ export class OrdersService {
         new Prisma.Decimal(0),
       );
 
+    const deliveryFeeAmount = await this.platform.resolveDeliveryFee({
+      mode: route.fulfillmentMode,
+      deliveryAreaName: dto.deliveryAreaName,
+      subtotal: subtotalAmount,
+    });
+
+    let discountAmount = new Prisma.Decimal(0);
+    let appliedCoupon: string | null = null;
+    if (dto.couponCode?.trim()) {
+      const validated = await this.platform.validateCoupon({
+        code: dto.couponCode,
+        subtotal: Number(subtotalAmount.toString()),
+      });
+      if (!validated.ok) {
+        throw new BadRequestException(validated.message);
+      }
+      discountAmount = new Prisma.Decimal(validated.discountAmount);
+      appliedCoupon = validated.code;
+    }
+
+    const totalAmount = subtotalAmount
+      .sub(discountAmount)
+      .add(deliveryFeeAmount);
+    if (totalAmount.lessThan(0)) {
+      throw new BadRequestException('Order total cannot be negative');
+    }
+
     return this.prisma.$transaction(async (tx) => {
+      if (dto.holdId) {
+        await this.stock.consumeHoldInTx(tx, {
+          holdId: dto.holdId,
+          customerId: customer.id,
+          expectedLines,
+        });
+      } else {
+        await this.stock.reserveAndDecrementInTx(tx, expectedLines);
+      }
+
       const order = await tx.order.create({
         data: {
           customerId: customer.id,
           fulfillmentMode: route.fulfillmentMode,
           status: OrderStatus.confirmed,
+          subtotalAmount,
+          discountAmount,
+          deliveryFeeAmount,
           totalAmount,
+          couponCode: appliedCoupon,
           deliveryAddress: dto.deliveryAddress
             ? (dto.deliveryAddress as Prisma.InputJsonValue)
             : undefined,
@@ -108,6 +157,10 @@ export class OrdersService {
               fulfillmentStatus: FulfillmentStatus.pending,
               shopId: plan.shopId,
               multiShop: route.fulfillments.length > 1,
+              deliveryFeeAmount: deliveryFeeAmount.toString(),
+              discountAmount: discountAmount.toString(),
+              couponCode: appliedCoupon,
+              holdId: dto.holdId ?? null,
             },
           },
         });
@@ -117,6 +170,63 @@ export class OrdersService {
     }).then((created) => {
       this.metrics.inc('orderCreates');
       return created;
+    });
+  }
+
+  /** Soft-reserve stock for checkout confirm (TTL). */
+  async createStockHold(userId: string, dto: CreateOrderDto) {
+    const customer = await this.prisma.customer.findUnique({
+      where: { userId },
+    });
+    if (!customer) {
+      throw new ForbiddenException('Customer profile required');
+    }
+    if (customer.isBlocked) {
+      throw new ForbiddenException('Customer is blocked');
+    }
+
+    const route = await this.routing.route({
+      fulfillmentMode: dto.fulfillmentMode,
+      preferredShopId: dto.preferredShopId,
+      deliveryAreaName: dto.deliveryAreaName,
+      deliveryAddress: dto.deliveryAddress,
+      customerRiskScore: customer.riskScore,
+      customerId: customer.id,
+      items: dto.items.map((i) => ({
+        productId: i.productId,
+        quantity: i.quantity,
+      })),
+    });
+
+    return this.stock.createOrReplaceHold({
+      customerId: customer.id,
+      fulfillments: route.fulfillments,
+    });
+  }
+
+  /** Dry-run routing for checkout confirm — no order, no shop identity. */
+  async previewRoute(userId: string, dto: CreateOrderDto) {
+    const customer = await this.prisma.customer.findUnique({
+      where: { userId },
+    });
+    if (!customer) {
+      throw new ForbiddenException('Customer profile required');
+    }
+    if (customer.isBlocked) {
+      throw new ForbiddenException('Customer is blocked');
+    }
+
+    return this.routing.previewAvailability({
+      fulfillmentMode: dto.fulfillmentMode,
+      preferredShopId: dto.preferredShopId,
+      deliveryAreaName: dto.deliveryAreaName,
+      deliveryAddress: dto.deliveryAddress,
+      customerRiskScore: customer.riskScore,
+      customerId: customer.id,
+      items: dto.items.map((i) => ({
+        productId: i.productId,
+        quantity: i.quantity,
+      })),
     });
   }
 
@@ -149,6 +259,7 @@ export class OrdersService {
         id: f.id,
         shopId: f.shopId,
         shopName: f.shop?.name,
+        shopAddress: f.shop?.address ?? null,
         status: f.status,
         deliveryDate: f.deliveryDate,
         estimatedDeliveryAt: f.estimatedDeliveryAt,

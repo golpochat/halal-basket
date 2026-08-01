@@ -125,6 +125,7 @@ export const CATEGORY_TREE: CategoryNode[] = [
   {
     id: 'dairy',
     name: 'Dairy & Eggs',
+    popular: true,
     matchNames: ['Dairy', 'Dairy & Eggs'],
     children: [
       { id: 'milk', name: 'Milk', matchNames: ['Dairy'] },
@@ -178,4 +179,19 @@ export function popularCategories(
   nodes: CategoryNode[] = CATEGORY_TREE,
 ): CategoryNode[] {
   return nodes.filter((n) => n.popular);
+}
+
+/** Resolve featured list for UI: API wins; fall back to static popular flags. */
+export function resolveFeaturedCategories(
+  fromApi: Array<{ id: string; name: string }> | undefined | null,
+): CategoryNode[] {
+  if (fromApi && fromApi.length > 0) {
+    return fromApi
+      .map((item) => findCategoryNode(item.id) ?? {
+        id: item.id,
+        name: item.name,
+      })
+      .filter((n): n is CategoryNode => Boolean(n?.id && n?.name));
+  }
+  return popularCategories();
 }

@@ -10,6 +10,7 @@
       "default": "./dist/index.js"
     },
     "./web": "./src/web/index.ts",
+    "./icons": "./icons/index.ts",
     "./styles/tokens.css": "./src/web/styles/tokens.css"
   },
   "scripts": {

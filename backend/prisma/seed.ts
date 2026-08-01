@@ -1,5 +1,6 @@
 import {
   PrismaClient,
+  ShopKind,
   UserRole,
   Weekday,
 } from "./generated/client";
@@ -63,6 +64,7 @@ async function main() {
     where: { id: "00000000-0000-4000-8000-000000000001" },
     update: {
       name: "Halal Basket Demo Shop",
+      kind: ShopKind.shop,
       address: "Main Street, Lucan, Co. Dublin",
       phone: "+353 1 000 0000",
       email: "shop@halalbasket.ie",
@@ -74,12 +76,40 @@ async function main() {
     create: {
       id: "00000000-0000-4000-8000-000000000001",
       name: "Halal Basket Demo Shop",
+      kind: ShopKind.shop,
       address: "Main Street, Lucan, Co. Dublin",
       phone: "+353 1 000 0000",
       email: "shop@halalbasket.ie",
       deliveryZones: ["Lucan", "Swords", "Tallaght"],
       lat: 53.3574,
       lng: -6.4473,
+      isActive: true,
+    },
+  });
+
+  const warehouse = await prisma.shop.upsert({
+    where: { id: "00000000-0000-4000-8000-0000000000aa" },
+    update: {
+      name: "HB Dublin Warehouse",
+      kind: ShopKind.warehouse,
+      address: "Unit 4, Westpoint Business Park, Dublin 22",
+      phone: "+353 1 000 0099",
+      email: "warehouse@halalbasket.ie",
+      deliveryZones: ["Lucan", "Swords", "Tallaght"],
+      lat: 53.344,
+      lng: -6.42,
+      isActive: true,
+    },
+    create: {
+      id: "00000000-0000-4000-8000-0000000000aa",
+      name: "HB Dublin Warehouse",
+      kind: ShopKind.warehouse,
+      address: "Unit 4, Westpoint Business Park, Dublin 22",
+      phone: "+353 1 000 0099",
+      email: "warehouse@halalbasket.ie",
+      deliveryZones: ["Lucan", "Swords", "Tallaght"],
+      lat: 53.344,
+      lng: -6.42,
       isActive: true,
     },
   });
@@ -178,6 +208,7 @@ async function main() {
       update: {
         price: row.price,
         isInStock: true,
+        stockQuantity: 100,
         isVisible: true,
       },
       create: {
@@ -185,6 +216,30 @@ async function main() {
         productId: product.id,
         price: row.price,
         isInStock: true,
+        stockQuantity: 100,
+        isVisible: true,
+      },
+    });
+
+    await prisma.shopProduct.upsert({
+      where: {
+        shopId_productId: {
+          shopId: warehouse.id,
+          productId: product.id,
+        },
+      },
+      update: {
+        price: row.price,
+        isInStock: true,
+        stockQuantity: 100,
+        isVisible: true,
+      },
+      create: {
+        shopId: warehouse.id,
+        productId: product.id,
+        price: row.price,
+        isInStock: true,
+        stockQuantity: 100,
         isVisible: true,
       },
     });
@@ -210,6 +265,35 @@ async function main() {
         deliveryDay: row.deliveryDay,
         isActive: true,
       },
+    });
+  }
+
+  const feeSettings: Array<{ key: string; value: string }> = [
+    { key: "delivery_fee_amount", value: "3.99" },
+    { key: "pickup_fee_amount", value: "0" },
+    { key: "delivery_free_over_amount", value: "0" },
+    { key: "delivery_fees_by_area", value: "{}" },
+    {
+      key: "cart_promo",
+      value: JSON.stringify({
+        bannerEnabled: true,
+        bannerMessage: "You have reduced delivery charge",
+      }),
+    },
+    {
+      key: "coupons",
+      value: JSON.stringify([
+        { code: "HALAL10", type: "percent", value: 10, active: true },
+        { code: "WELCOME5", type: "fixed", value: 5, active: true },
+      ]),
+    },
+    { key: "warehouse_fulfillment_published", value: "false" },
+  ];
+  for (const row of feeSettings) {
+    await prisma.platformSetting.upsert({
+      where: { key: row.key },
+      update: { value: row.value },
+      create: row,
     });
   }
 
@@ -321,6 +405,30 @@ async function main() {
     });
   }
 
+  const featuredSeed = [
+    { categoryId: "meat-poultry", sortOrder: 0 },
+    { categoryId: "fruits-veg", sortOrder: 1 },
+    { categoryId: "cooking", sortOrder: 2 },
+    { categoryId: "beverages", sortOrder: 3 },
+    { categoryId: "home-cleaning", sortOrder: 4 },
+    { categoryId: "dairy", sortOrder: 5 },
+  ];
+
+  for (const row of featuredSeed) {
+    await prisma.featuredCategory.upsert({
+      where: { categoryId: row.categoryId },
+      update: {
+        sortOrder: row.sortOrder,
+        isActive: true,
+      },
+      create: {
+        categoryId: row.categoryId,
+        sortOrder: row.sortOrder,
+        isActive: true,
+      },
+    });
+  }
+
   console.log("Seeded users:");
   console.log(`  super_admin: ${superAdmin.email}`);
   console.log(`  admin:       ${admin.email}`);
@@ -328,9 +436,13 @@ async function main() {
   console.log(`  driver:      ${driverUser.email}`);
   console.log(`Password: ${SEED_PASSWORD}`);
   console.log(`Demo shop: ${shop.name} (${shop.id})`);
+  console.log(`Demo warehouse: ${warehouse.name} (${warehouse.id})`);
   console.log("Seeded delivery calendar: Lucan, Swords, Tallaght");
+  console.log("Seeded delivery fees: scheduled 3.99, pickup 0");
+  console.log("Warehouse fulfillment: unpublished");
   console.log("Seeded currencies: EUR (default published), GBP, USD");
   console.log("Seeded languages: en (default published), bn, hi, ur, ar");
+  console.log("Seeded featured categories: 6 catalogue roots");
 }
 
 main()

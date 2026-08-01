@@ -52,7 +52,7 @@ export const useCatalogueStore = create<CatalogueState>()(
     (set, get) => ({
       search: '',
       browsePath: [],
-      category: 'all',
+      category: '',
       area: '',
       shopId: '',
       filters: defaultFilters,
@@ -66,7 +66,7 @@ export const useCatalogueStore = create<CatalogueState>()(
       setBrowsePath: (browsePath) =>
         set({
           browsePath,
-          category: browsePath[browsePath.length - 1] ?? 'all',
+          category: browsePath[browsePath.length - 1] ?? '',
         }),
       pushBrowse: (id) => {
         const browsePath = [...get().browsePath, id];
@@ -74,27 +74,26 @@ export const useCatalogueStore = create<CatalogueState>()(
       },
       popBrowseTo: (index) => {
         if (index < 0) {
-          set({ browsePath: [], category: 'all' });
+          set({ browsePath: [], category: '' });
           return;
         }
         const browsePath = get().browsePath.slice(0, index + 1);
         set({
           browsePath,
-          category: browsePath[browsePath.length - 1] ?? 'all',
+          category: browsePath[browsePath.length - 1] ?? '',
         });
       },
-      goHome: () => set({ browsePath: [], category: 'all', search: '' }),
+      goHome: () => set({ browsePath: [], category: '', search: '' }),
       setCategory: (category) => {
-        if (category === 'all') {
-          set({ category: 'all', browsePath: [] });
-        } else {
-          const browsePath = categoryPathIds(category) ?? [category];
-          set({ category, browsePath });
+        if (!category) {
+          set({ category: '', browsePath: [] });
+          return;
         }
+        const browsePath = categoryPathIds(category) ?? [category];
+        set({ category, browsePath });
       },
       setArea: (area) => set({ area }),
-      setShopId: (shopId) =>
-        set({ shopId, category: 'all', browsePath: [] }),
+      setShopId: (shopId) => set({ shopId, category: '', browsePath: [] }),
       setFilters: (patch) =>
         set({ filters: { ...get().filters, ...patch } }),
       resetFilters: () => set({ filters: defaultFilters }),
@@ -125,7 +124,6 @@ export const useCatalogueStore = create<CatalogueState>()(
       name: 'hb_catalogue',
       partialize: (s) => ({
         area: s.area,
-        shopId: s.shopId,
         recentlyViewed: s.recentlyViewed,
         filters: s.filters,
         viewMode: s.viewMode,

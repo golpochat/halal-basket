@@ -1,20 +1,21 @@
 import { Link } from 'react-router-dom';
 import { BrandLogo } from '../brand/BrandLogo';
-import { useAuth } from '../../auth/AuthContext';
-import { homeForRole } from '../../lib/api';
+import { HB_CHROME_FOOTER_GRID, HB_CHROME_PAD } from './chrome';
 
 const linkClass =
-  'block rounded-lg py-2 text-sm text-[var(--hb-ink)]/70 transition hover:text-[var(--hb-green)]';
+  'block rounded-[var(--hb-radius)] py-2 text-sm font-medium text-[var(--hb-ink)]/70 transition duration-[220ms] ease-[var(--hb-ease-out)] hover:text-[var(--hb-green)]';
+
+const headingClass =
+  'text-xs font-semibold uppercase tracking-wide text-[var(--hb-ink)]/45';
 
 export function SiteFooter() {
-  const { session } = useAuth();
   const year = new Date().getFullYear();
 
   return (
-    <footer className="mt-auto w-full shrink-0 border-t border-[rgba(26,92,58,0.1)] bg-[rgba(247,250,246,0.75)]">
-      <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:grid-cols-2 sm:px-6 lg:grid-cols-4">
+    <footer className="mt-auto w-full shrink-0 border-t border-[rgba(26,92,58,0.1)] bg-[rgba(247,250,246,0.9)]">
+      <div className={`${HB_CHROME_FOOTER_GRID} ${HB_CHROME_PAD}`}>
         <div className="sm:col-span-2 lg:col-span-1">
-          <BrandLogo size="sm" />
+          <BrandLogo size="lg" />
           <p className="mt-3 max-w-xs text-sm leading-relaxed text-[var(--hb-ink)]/60">
             Halal groceries from trusted local shops — pickup or scheduled
             delivery across the Dublin pilot.
@@ -22,89 +23,59 @@ export function SiteFooter() {
         </div>
 
         <div>
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--hb-ink)]/45">
-            Shop
-          </h2>
-          <ul className="mt-3 space-y-0.5">
+          <h2 className={headingClass}>Shop</h2>
+          <ul className="mt-3 space-y-1">
             <li>
               <Link to="/" className={linkClass}>
-                Catalogue
+                Home
               </Link>
             </li>
             <li>
-              <Link to="/help" className={linkClass}>
-                Help & FAQ
-              </Link>
-            </li>
-            <li>
-              <Link to="/register" className={linkClass}>
-                Create account
+              <Link to="/faq" className={linkClass}>
+                FAQ
               </Link>
             </li>
           </ul>
         </div>
 
         <div>
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--hb-ink)]/45">
-            Account
-          </h2>
-          <ul className="mt-3 space-y-0.5">
-            {session ? (
-              <>
-                <li>
-                  <Link
-                    to={homeForRole(session.user.role)}
-                    className={linkClass}
-                  >
-                    Dashboard
-                  </Link>
-                </li>
-                {session.user.role === 'customer' && (
-                  <li>
-                    <Link to="/orders" className={linkClass}>
-                      My orders
-                    </Link>
-                  </li>
-                )}
-              </>
-            ) : (
-              <li>
-                <Link to="/login" className={linkClass}>
-                  Sign in
-                </Link>
-              </li>
-            )}
+          <h2 className={headingClass}>Delivery</h2>
+          <ul className="mt-3 space-y-1">
             <li>
-              <Link to="/help" className={linkClass}>
-                Fees & refunds
+              <Link to="/delivery-locations" className={linkClass}>
+                Delivery locations
+              </Link>
+            </li>
+            <li>
+              <Link to="/delivery-charges" className={linkClass}>
+                Delivery charges
               </Link>
             </li>
           </ul>
         </div>
 
         <div>
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--hb-ink)]/45">
-            Operations
-          </h2>
-          <ul className="mt-3 space-y-0.5">
+          <h2 className={headingClass}>Legal</h2>
+          <ul className="mt-3 space-y-1">
             <li>
-              <Link to="/login" className={linkClass}>
-                Staff login
+              <Link to="/privacy" className={linkClass}>
+                Privacy policy
               </Link>
             </li>
             <li>
-              <Link to="/help" className={linkClass}>
-                Delivery areas
+              <Link to="/terms" className={linkClass}>
+                Terms of service
               </Link>
             </li>
           </ul>
         </div>
       </div>
 
-      <div className="border-t border-[rgba(26,92,58,0.08)]">
-        <div className="mx-auto flex max-w-6xl flex-col gap-1 px-4 py-4 text-xs text-[var(--hb-ink)]/45 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+      <div className="border-t border-[rgba(26,92,58,0.1)] bg-[rgba(19,38,28,0.04)]">
+        <div
+          className={`py-4 text-center text-xs text-[var(--hb-ink)]/50 ${HB_CHROME_PAD}`}
+        >
           <p>© {year} Halal Basket</p>
-          <p>Dublin pilot · Lucan · Swords · Tallaght</p>
         </div>
       </div>
     </footer>
