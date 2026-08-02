@@ -5,6 +5,7 @@ import { LocaleProvider } from './locale/LocaleContext';
 import { DriverLayout } from './layouts/DriverLayout';
 import { LoginPage } from './pages/LoginPage';
 import { DriverTodayPage } from './pages/driver/TodayPage';
+import { DriverHistoryPage } from './pages/driver/HistoryPage';
 import { DriverDetailPage } from './pages/driver/DetailPage';
 import { RedirectOrderDetail } from './pages/RedirectOrderDetail';
 import { DriverProfilePage } from './pages/driver/ProfilePage';
@@ -20,6 +21,7 @@ export default function App() {
             <Route path="/driver" element={<DriverLayout />}>
               <Route index element={<Navigate to="dashboard" replace />} />
               <Route path="dashboard" element={<DriverTodayPage />} />
+              <Route path="history" element={<DriverHistoryPage />} />
               <Route path="orders/:id" element={<DriverDetailPage />} />
               <Route path="profile" element={<DriverProfilePage />} />
             </Route>

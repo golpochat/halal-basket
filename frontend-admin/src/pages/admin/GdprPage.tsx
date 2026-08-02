@@ -32,9 +32,9 @@ function GdprInner() {
           <p className="mt-1 text-sm text-[var(--hb-ink)]/55">
             Permanently erase a customer by customer UUID (super-admin only).
           </p>
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-3 flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap">
             <input
-              className="hb-input min-w-[16rem] flex-1"
+              className="hb-input min-w-0 w-full flex-1 basis-[16rem]"
               placeholder="Customer UUID"
               value={eraseId}
               onChange={(e) => setEraseId(e.target.value)}

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import {
   CATEGORY_TREE,
   categoryIcon,
+  IconButton,
   UtilityIcons,
   ICON_SIZES,
   resolveFeaturedCategories,
@@ -204,14 +205,12 @@ export function CategorySidebar() {
         >
           <div className="flex items-center justify-between border-b border-[rgba(26,92,58,0.1)] px-4 py-3">
             <p className="font-semibold">Categories</p>
-            <button
-              type="button"
-              className="hb-icon-btn"
-              aria-label="Close categories"
+            <IconButton
+              label="Close categories"
               onClick={() => setSidebarOpen(false)}
             >
               {UtilityIcons.close({ size: ICON_SIZES.sm })}
-            </button>
+            </IconButton>
           </div>
           <div className="flex-1 overflow-y-auto">{list}</div>
         </aside>

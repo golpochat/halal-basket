@@ -162,6 +162,17 @@ export class AuthService {
         ? undefined
         : this.normalizeAvatarUrl(dto.avatarUrl);
 
+    let nextAddressList: ReturnType<AuthService['normalizeAddressList']> | null =
+      null;
+    if (dto.addressList !== undefined) {
+      if (!user.customer) {
+        throw new BadRequestException(
+          'Only customer accounts can save delivery addresses',
+        );
+      }
+      nextAddressList = this.normalizeAddressList(dto.addressList);
+    }
+
     await this.prisma.$transaction(async (tx) => {
       await tx.user.update({
         where: { id: user.id },
@@ -199,6 +210,13 @@ export class AuthService {
           data: { phone: dto.phone.trim() || null },
         });
       }
+
+      if (nextAddressList !== null && user.customer) {
+        await tx.customer.update({
+          where: { id: user.customer.id },
+          data: { addressList: nextAddressList },
+        });
+      }
     });
 
     const refreshed = await this.prisma.user.findUniqueOrThrow({
@@ -226,19 +244,95 @@ export class AuthService {
     if (!value) return null;
     if (value.startsWith('data:image/')) {
       if (value.length > 700_000) {
-        throw new BadRequestException('Profile image is too large');
+        throw new BadRequestException(
+          'That image is too large. Please use a photo under 350KB.',
+        );
       }
       return value;
     }
     if (/^https?:\/\//i.test(value)) {
       if (value.length > 2048) {
-        throw new BadRequestException('Profile image URL is too long');
+        throw new BadRequestException(
+          'That image link is too long. Please use a shorter URL.',
+        );
       }
       return value;
     }
     throw new BadRequestException(
-      'Avatar must be an http(s) URL or image data URL',
+      'Please upload an image file or paste a valid image link.',
     );
+  }
+
+  private normalizeEircode(raw: string): string {
+    const compact = raw.replace(/\s+/g, '').toUpperCase();
+    if (compact.length !== 7) return compact;
+    return `${compact.slice(0, 3)} ${compact.slice(3)}`;
+  }
+
+  private normalizeAddressList(
+    raw: Array<{
+      id: string;
+      line1: string;
+      eircode: string;
+      area_name: string;
+      label: string;
+      isDefault?: boolean;
+    }>,
+  ) {
+    const seen = new Set<string>();
+    const list = raw.map((a) => {
+      const id = a.id.trim();
+      if (!id || seen.has(id)) {
+        throw new BadRequestException('Each address needs a unique id');
+      }
+      seen.add(id);
+      return {
+        id,
+        label: a.label.trim(),
+        line1: a.line1.trim(),
+        eircode: this.normalizeEircode(a.eircode),
+        area_name: a.area_name.trim(),
+        isDefault: Boolean(a.isDefault),
+      };
+    });
+
+    const defaultCount = list.filter((a) => a.isDefault).length;
+    if (defaultCount > 1) {
+      throw new BadRequestException('Only one default address is allowed');
+    }
+    if (list.length > 0 && defaultCount === 0) {
+      list[0]!.isDefault = true;
+    }
+    return list;
+  }
+
+  private readAddressList(value: unknown) {
+    if (!Array.isArray(value)) return [];
+    return value
+      .map((entry) => {
+        if (!entry || typeof entry !== 'object') return null;
+        const a = entry as Record<string, unknown>;
+        const id = typeof a.id === 'string' ? a.id : '';
+        const line1 = typeof a.line1 === 'string' ? a.line1 : '';
+        const eircode = typeof a.eircode === 'string' ? a.eircode : '';
+        const area_name =
+          typeof a.area_name === 'string'
+            ? a.area_name
+            : typeof a.areaName === 'string'
+              ? a.areaName
+              : '';
+        const label = typeof a.label === 'string' ? a.label : '';
+        if (!id || !line1 || !area_name || !eircode || !label) return null;
+        return {
+          id,
+          label,
+          line1,
+          eircode: this.normalizeEircode(eircode),
+          area_name,
+          isDefault: Boolean(a.isDefault),
+        };
+      })
+      .filter((a): a is NonNullable<typeof a> => a != null);
   }
 
   private profileResponse(user: {
@@ -247,7 +341,7 @@ export class AuthService {
     phone: string | null;
     avatarUrl?: string | null;
     role: UserRole;
-    customer: { name: string } | null;
+    customer: { name: string; addressList?: unknown } | null;
     driver: { name: string; phone: string | null } | null;
     shopUsers: Array<{ shop: { name: string } }>;
   }) {
@@ -264,6 +358,9 @@ export class AuthService {
       role: user.role,
       name,
       canEditName: Boolean(user.customer || user.driver),
+      addressList: user.customer
+        ? this.readAddressList(user.customer.addressList)
+        : undefined,
     };
   }
 

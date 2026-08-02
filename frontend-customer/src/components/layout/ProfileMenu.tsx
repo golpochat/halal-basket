@@ -29,6 +29,12 @@ export function ProfileMenu() {
         icon: 'account',
       },
       {
+        key: 'addresses',
+        label: 'Addresses',
+        to: '/customer/addresses',
+        icon: 'home',
+      },
+      {
         key: 'orders',
         label: 'My orders',
         to: '/customer/orders',

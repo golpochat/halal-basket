@@ -50,15 +50,20 @@ function ShopsInner() {
 
         <section className="hb-surface mb-8 p-5 shadow-sm">
           <h2 className="font-display text-xl font-semibold">Create shop</h2>
-          <form onSubmit={createShop} className="mt-3 flex flex-wrap gap-2">
+          <form
+            onSubmit={createShop}
+            className="mt-3 flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center"
+          >
             <input
-              className="hb-input min-w-[14rem] flex-1"
+              className="hb-input min-w-0 w-full flex-1 basis-[14rem]"
               placeholder="Shop name"
               value={shopName}
               onChange={(e) => setShopName(e.target.value)}
               required
             />
-            <button className="hb-btn hb-btn-primary">Create shop</button>
+            <button className="hb-btn hb-btn-primary w-full sm:w-auto">
+              Create shop
+            </button>
           </form>
         </section>
       </div>

@@ -91,6 +91,12 @@ export const UtilityIcons = {
     p('M2.5 12h3', 'w'),
     p('M18.5 12h3', 'e'),
   ]),
+  phone: utilIcon([
+    p(
+      'M6.5 3.5h3.2l1.2 3.2-2 1.2a12 12 0 005.4 5.4l1.2-2 3.2 1.2v3.2a2 2 0 01-2.2 2A16.5 16.5 0 014.5 5.7a2 2 0 012-2.2z',
+      'handset',
+    ),
+  ]),
   menu: utilIcon([
     p('M4 7h16', 'a'),
     p('M4 12h16', 'b'),
@@ -272,6 +278,16 @@ export const UtilityIcons = {
       r: 1.35,
       fill: 'currentColor',
     }),
+  ]),
+  edit: utilIcon([
+    p('M4 20h4l10.5-10.5-4-4L4 16v4z', 'body'),
+    p('M13.5 6.5l4 4', 'tip'),
+  ]),
+  trash: utilIcon([
+    p('M5 7h14', 'lid'),
+    p('M9 7V5h6v2', 'handle'),
+    p('M7 7l1 13h8l1-13', 'bin'),
+    p('M10 11v6M14 11v6', 'lines'),
   ]),
 } as const;
 

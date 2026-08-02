@@ -290,7 +290,8 @@ export class RoutingEngineService {
         await this.calendar.resolveNextDeliveryDate(input.deliveryAreaName)
       ).deliveryDate;
     } else {
-      estimatedDeliveryAt = new Date(Date.now() + 60 * 60 * 1000);
+      const etaMs = this.flags.realtimeEtaMinutes() * 60 * 1000;
+      estimatedDeliveryAt = new Date(Date.now() + etaMs);
     }
 
     const candidates = await this.shopsServingArea(input.deliveryAreaName);

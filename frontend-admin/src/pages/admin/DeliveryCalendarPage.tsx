@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { SelectInput } from '@halal-basket/web';
 import { RequireAuth, RequireRole } from '../../auth/guards';
 import { useAuth } from '../../auth/AuthContext';
 import { api } from '../../lib/api';
@@ -155,20 +156,12 @@ function DeliveryCalendarInner() {
                 required
               />
             </label>
-            <label className="text-sm">
-              Delivery day
-              <select
-                className="hb-input mt-1.5"
-                value={newDay}
-                onChange={(e) => setNewDay(e.target.value)}
-              >
-                {WEEKDAYS.map((d) => (
-                  <option key={d} value={d}>
-                    {d}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <SelectInput
+              label="Delivery day"
+              value={newDay}
+              options={WEEKDAYS.map((d) => ({ value: d, label: d }))}
+              onChange={setNewDay}
+            />
             <div className="flex items-end">
               <button
                 type="submit"

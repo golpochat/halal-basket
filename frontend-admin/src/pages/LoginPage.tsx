@@ -1,6 +1,13 @@
 import { FormEvent, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Button, TextInput, ToastViewport, isExternalHome } from '@halal-basket/web';
+import {
+  Button,
+  TextInput,
+  ToastViewport,
+  formatUserFacingError,
+  isExternalHome,
+  toastError,
+} from '@halal-basket/web';
 import { PasswordInput } from '../components/ui/PasswordInput';
 import { BrandLogo } from '../components/brand/BrandLogo';
 import { useAuth } from '../auth/AuthContext';
@@ -34,7 +41,9 @@ function LoginForm() {
         body: JSON.stringify({ email, password }),
       });
       if (result.user.role !== 'admin' && result.user.role !== 'super_admin') {
-        setError('This portal is for admin accounts only.');
+        const msg = 'This portal is for admin accounts only.';
+        setError(msg);
+        toastError(msg);
         return;
       }
       setSession(result);
@@ -47,7 +56,9 @@ function LoginForm() {
       }
       navigate(dest);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Sign-in failed');
+      const msg = formatUserFacingError(err, 'Could not sign in');
+      setError(msg);
+      toastError(msg);
     } finally {
       setLoading(false);
     }

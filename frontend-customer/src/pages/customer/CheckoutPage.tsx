@@ -1,6 +1,14 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
-import { LocationSelect } from '@halal-basket/web';
+import {
+  LocationSelect,
+  SelectInput,
+  formatUserFacingError,
+  isValidEircode,
+  normalizeEircode,
+  toastError,
+  type CustomerAddress,
+} from '@halal-basket/web';
 import { RequireAuth, RequireRole } from '../../auth/guards';
 import { useAuth } from '../../auth/AuthContext';
 import { SiteHeader } from '../../components/layout/SiteHeader';
@@ -12,6 +20,10 @@ import {
   resolveDeliveryFee,
   type DeliveryFeeConfig,
 } from '../../lib/delivery-fee';
+
+type ProfileAddresses = {
+  addressList?: CustomerAddress[];
+};
 
 type CheckoutDraft = {
   items: Array<{
@@ -27,6 +39,7 @@ type CheckoutDraft = {
 type Features = {
   realtimeDelivery: boolean;
   multiShop: boolean;
+  realtimeEtaMinutes?: number;
 };
 
 type Mode = 'pickup' | 'scheduled_delivery' | 'realtime_delivery';
@@ -78,6 +91,9 @@ function CheckoutWizard() {
   const [mode, setMode] = useState<Mode>('pickup');
   const [area, setArea] = useState(draft?.area ?? '');
   const [address, setAddress] = useState('');
+  const [eircode, setEircode] = useState('');
+  const [savedAddresses, setSavedAddresses] = useState<CustomerAddress[]>([]);
+  const [addressPrefillNote, setAddressPrefillNote] = useState('');
   const [nextDelivery, setNextDelivery] = useState<ResolveResult | null>(null);
   const [areaError, setAreaError] = useState('');
   const [error, setError] = useState('');
@@ -127,7 +143,13 @@ function CheckoutWizard() {
   useEffect(() => {
     api<Features>('/features')
       .then(setFeatures)
-      .catch(() => setFeatures({ realtimeDelivery: false, multiShop: false }));
+      .catch(() =>
+        setFeatures({
+          realtimeDelivery: false,
+          multiShop: false,
+          realtimeEtaMinutes: 60,
+        }),
+      );
     api<CalendarRow[]>('/delivery-calendar')
       .then((rows) => {
         setCalendar(rows);
@@ -138,6 +160,32 @@ function CheckoutWizard() {
       .then(setDeliveryConfig)
       .catch(() => setDeliveryConfig(null));
   }, []);
+
+  useEffect(() => {
+    if (!session?.accessToken) return;
+    let cancelled = false;
+    api<ProfileAddresses>('/auth/me', { token: session.accessToken })
+      .then((p) => {
+        if (cancelled) return;
+        const list = p.addressList ?? [];
+        setSavedAddresses(list);
+        const def = list.find((a) => a.isDefault) ?? list[0];
+        if (!def) return;
+        setAddress((prev) => {
+          if (prev.trim()) return prev;
+          setAddressPrefillNote('Using your default saved address');
+          setEircode((e) => (e.trim() ? e : def.eircode));
+          return def.line1;
+        });
+        if (!draft?.area) {
+          setArea((prev) => def.area_name || prev);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.accessToken, draft?.area]);
 
   useEffect(() => {
     const code = draft?.couponCode?.trim();
@@ -178,9 +226,13 @@ function CheckoutWizard() {
   }, [draft?.couponCode, itemsSubtotal]);
 
   useEffect(() => {
-    if (!area || mode === 'pickup') {
+    if (!area || mode === 'pickup' || mode === 'realtime_delivery') {
       setNextDelivery(null);
-      setAreaError('');
+      setAreaError(
+        area && mode === 'realtime_delivery' && !areas.includes(area)
+          ? 'Choose a served delivery area'
+          : '',
+      );
       return;
     }
     api<ResolveResult>(
@@ -194,7 +246,7 @@ function CheckoutWizard() {
         setNextDelivery(null);
         setAreaError(e instanceof Error ? e.message : 'Area not served');
       });
-  }, [area, mode]);
+  }, [area, mode, areas]);
 
   useEffect(() => {
     if (step !== 3 || !session || !draft?.items.length || !area) {
@@ -205,10 +257,21 @@ function CheckoutWizard() {
       setHoldExpiresAt(null);
       return;
     }
-    if (mode !== 'pickup' && !nextDelivery) {
+    if (mode === 'scheduled_delivery' && !nextDelivery) {
       setPreviewOk(false);
       setUnavailableIds([]);
       setPreviewMessage('Choose a valid delivery area first');
+      setHoldId(null);
+      setHoldExpiresAt(null);
+      return;
+    }
+    if (
+      (mode === 'realtime_delivery' || mode === 'pickup') &&
+      !areas.includes(area)
+    ) {
+      setPreviewOk(false);
+      setUnavailableIds([]);
+      setPreviewMessage('Choose a valid area first');
       setHoldId(null);
       setHoldExpiresAt(null);
       return;
@@ -232,7 +295,11 @@ function CheckoutWizard() {
         : {
             fulfillmentMode: mode,
             deliveryAreaName: area,
-            deliveryAddress: { line1: address, area_name: area },
+            deliveryAddress: {
+              line1: address,
+              eircode: normalizeEircode(eircode),
+              area_name: area,
+            },
             items,
           };
 
@@ -292,7 +359,7 @@ function CheckoutWizard() {
     return () => {
       cancelled = true;
     };
-  }, [step, session, draft, area, mode, address, nextDelivery]);
+  }, [step, session, draft, area, mode, address, eircode, nextDelivery]);
 
   if (!draft?.items?.length) {
     return <Navigate to="/" replace />;
@@ -301,45 +368,66 @@ function CheckoutWizard() {
   function canNext() {
     if (step === 1) {
       if (!mode) return false;
-      if (mode === 'scheduled_delivery' && areas.length === 0) return false;
+      if (
+        (mode === 'scheduled_delivery' || mode === 'realtime_delivery') &&
+        areas.length === 0
+      ) {
+        return false;
+      }
       return true;
     }
     if (step === 2) {
       if (!area || !areas.includes(area)) return false;
       if (mode === 'pickup') return true;
-      return (
-        address.trim().length > 3 && !!nextDelivery && !areaError
-      );
+      const addressOk =
+        address.trim().length > 3 && isValidEircode(eircode) && !areaError;
+      if (mode === 'realtime_delivery') return addressOk;
+      return addressOk && !!nextDelivery;
     }
     return true;
+  }
+
+  function showCheckoutError(message: string) {
+    setError(message);
+    toastError(message);
   }
 
   async function placeOrder(e: FormEvent) {
     e.preventDefault();
     if (!session) return;
     if (previewOk !== true) {
-      setError(previewMessage || 'Some items are unavailable in this area');
+      showCheckoutError(
+        previewMessage || 'Some items are unavailable in this area',
+      );
       return;
     }
     if (!holdId) {
-      setError('Stock reservation missing — wait for availability check');
+      showCheckoutError(
+        'Stock reservation missing — wait for availability check',
+      );
       return;
     }
     if (
       holdExpiresAt &&
       new Date(holdExpiresAt).getTime() <= Date.now()
     ) {
-      setError('Stock reservation expired — refresh confirm and try again');
+      showCheckoutError(
+        'Stock reservation expired — refresh confirm and try again',
+      );
       setHoldId(null);
       setPreviewOk(null);
       return;
     }
     if (!areas.includes(area)) {
-      setError('Choose a collection or delivery area before placing order');
+      showCheckoutError(
+        'Choose a collection or delivery area before placing order',
+      );
       return;
     }
-    if (mode !== 'pickup' && !nextDelivery) {
-      setError('Choose a delivery area from the calendar before placing order');
+    if (mode === 'scheduled_delivery' && !nextDelivery) {
+      showCheckoutError(
+        'Choose a delivery area from the calendar before placing order',
+      );
       return;
     }
     setLoading(true);
@@ -361,7 +449,11 @@ function CheckoutWizard() {
           : {
               fulfillmentMode: mode,
               deliveryAreaName: area,
-              deliveryAddress: { line1: address, area_name: area },
+              deliveryAddress: {
+                line1: address,
+                eircode: normalizeEircode(eircode),
+                area_name: area,
+              },
               items,
               couponCode: appliedCoupon || undefined,
               holdId,
@@ -377,10 +469,11 @@ function CheckoutWizard() {
       setHoldId(null);
       setHoldExpiresAt(null);
       setPreviewOk(null);
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Order failed — stock may have changed',
+      showCheckoutError(
+        formatUserFacingError(
+          err,
+          'Order failed — stock may have changed. Please try again.',
+        ),
       );
     } finally {
       setLoading(false);
@@ -465,7 +558,16 @@ function CheckoutWizard() {
                   checked={mode === value}
                   onChange={() => setMode(value)}
                 />
-                {label}
+                <span>
+                  {label}
+                  {value === 'realtime_delivery' && (
+                    <span className="mt-0.5 block text-xs font-normal text-[var(--hb-ink)]/55">
+                      Same-day ASAP · typically within{' '}
+                      {features?.realtimeEtaMinutes ?? 60} minutes when stock
+                      allows
+                    </span>
+                  )}
+                </span>
               </label>
             ))}
             {mode !== 'pickup' && areas.length === 0 && (
@@ -495,7 +597,14 @@ function CheckoutWizard() {
                 order.
               </p>
             )}
-            {mode !== 'pickup' && nextDelivery && (
+            {mode === 'realtime_delivery' && (
+              <p className="rounded-lg bg-[var(--hb-mist)] px-3 py-2 text-sm">
+                Realtime delivery aims for ASAP — estimated within{' '}
+                <strong>{features?.realtimeEtaMinutes ?? 60} minutes</strong>{' '}
+                after confirmation when a shop in your area has stock.
+              </p>
+            )}
+            {mode === 'scheduled_delivery' && nextDelivery && (
               <p className="rounded-lg bg-[var(--hb-mist)] px-3 py-2 text-sm">
                 Next delivery:{' '}
                 <strong>
@@ -515,14 +624,67 @@ function CheckoutWizard() {
             {mode !== 'pickup' && areaError && (
               <p className="text-sm text-red-700">{areaError}</p>
             )}
+            {mode !== 'pickup' && savedAddresses.length > 0 && (
+              <SelectInput
+                label="Saved address"
+                placeholder="Choose saved address…"
+                value={
+                  savedAddresses.find(
+                    (a) =>
+                      a.line1 === address &&
+                      a.area_name === area &&
+                      a.eircode === normalizeEircode(eircode),
+                  )?.id ?? ''
+                }
+                options={savedAddresses.map((a) => ({
+                  value: a.id,
+                  label: `${a.label}${a.isDefault ? ' (default)' : ''} — ${a.area_name}`,
+                }))}
+                onChange={(id) => {
+                  const picked = savedAddresses.find((a) => a.id === id);
+                  if (!picked) return;
+                  setAddress(picked.line1);
+                  setEircode(picked.eircode);
+                  setArea(picked.area_name);
+                  setAddressPrefillNote(
+                    picked.isDefault
+                      ? 'Using your default saved address'
+                      : `Using saved address (${picked.label})`,
+                  );
+                }}
+              />
+            )}
+            {mode !== 'pickup' && addressPrefillNote && (
+              <p className="text-xs text-[var(--hb-ink)]/55">
+                {addressPrefillNote}
+              </p>
+            )}
             {mode !== 'pickup' && (
               <label className="block text-sm font-medium">
                 Address
                 <input
                   className="hb-input mt-1.5"
                   value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  placeholder="Street, number, Eircode"
+                  onChange={(e) => {
+                    setAddress(e.target.value);
+                    setAddressPrefillNote('');
+                  }}
+                  placeholder="House number and street"
+                  required
+                />
+              </label>
+            )}
+            {mode !== 'pickup' && (
+              <label className="block text-sm font-medium">
+                Eircode
+                <input
+                  className="hb-input mt-1.5"
+                  value={eircode}
+                  onChange={(e) => {
+                    setEircode(e.target.value.toUpperCase());
+                    setAddressPrefillNote('');
+                  }}
+                  placeholder="A65 F4E2"
                   required
                 />
               </label>
@@ -559,15 +721,21 @@ function CheckoutWizard() {
             <p>Items: {draft.items.length} line(s)</p>
             <p>Area: {area}</p>
             {mode !== 'pickup' && (
-              <>
-                <p>Address: {address}</p>
-                {nextDelivery && (
-                  <p>
-                    Delivery day:{' '}
-                    {new Date(nextDelivery.deliveryDate).toLocaleDateString()}
-                  </p>
-                )}
-              </>
+              <p>
+                Address: {address}, {normalizeEircode(eircode)}
+              </p>
+            )}
+            {mode === 'scheduled_delivery' && nextDelivery && (
+              <p>
+                Delivery day:{' '}
+                {new Date(nextDelivery.deliveryDate).toLocaleDateString()}
+              </p>
+            )}
+            {mode === 'realtime_delivery' && (
+              <p>
+                ETA window: about {features?.realtimeEtaMinutes ?? 60} minutes
+                (confirmed after place)
+              </p>
             )}
             {mode === 'pickup' && (
               <p>Pickup from Halal Basket in {area}</p>

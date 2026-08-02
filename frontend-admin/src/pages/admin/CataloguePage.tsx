@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { SelectInput } from '@halal-basket/web';
 import { RequireAuth, RequireRole } from '../../auth/guards';
 import { useAuth } from '../../auth/AuthContext';
 import { api } from '../../lib/api';
@@ -65,18 +66,19 @@ function CatalogueInner() {
           <h2 className="font-display text-xl font-semibold">
             Catalogue import / export
           </h2>
-          <div className="mt-3 flex flex-wrap items-center gap-3">
-            <select
-              className="hb-input w-auto"
+          <div className="mt-3 flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+            <SelectInput
+              label="Shop"
+              showLabel={false}
+              className="w-full min-w-0 sm:max-w-xs"
               value={shopId}
-              onChange={(e) => setShopId(e.target.value)}
-            >
-              {shops.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
+              options={shops.map((s) => ({
+                value: s.id,
+                label: s.name,
+              }))}
+              onChange={setShopId}
+              placeholder="Select shop"
+            />
             <label className="hb-btn hb-btn-ghost cursor-pointer">
               Import CSV
               <input

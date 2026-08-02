@@ -1,8 +1,33 @@
+import { useEffect, useRef } from 'react';
+import { formatUserFacingError, toastError, toastSuccess } from '@halal-basket/web';
+
+/**
+ * Bridges legacy setError/setMsg state into the shared toast viewport.
+ * Renders nothing — messages appear as toasts across admin dashboards.
+ */
 export function Flash({ error, msg }: { error?: string; msg?: string }) {
-  return (
-    <>
-      {error && <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>}
-      {msg && <p className="mb-3 rounded-lg bg-[var(--hb-mist)] px-3 py-2 text-sm text-[var(--hb-green)]">{msg}</p>}
-    </>
-  );
+  const lastError = useRef<string | undefined>(undefined);
+  const lastMsg = useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (!error) {
+      lastError.current = undefined;
+      return;
+    }
+    if (error === lastError.current) return;
+    lastError.current = error;
+    toastError(formatUserFacingError(error));
+  }, [error]);
+
+  useEffect(() => {
+    if (!msg) {
+      lastMsg.current = undefined;
+      return;
+    }
+    if (msg === lastMsg.current) return;
+    lastMsg.current = msg;
+    toastSuccess(msg);
+  }, [msg]);
+
+  return null;
 }

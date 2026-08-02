@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ICON_SIZES, UtilityIcons } from '@halal-basket/web';
+import { ICON_SIZES, IconButton, UtilityIcons } from '@halal-basket/web';
 import { RequireAuth, RequireRole } from '../../auth/guards';
 import { useAuth } from '../../auth/AuthContext';
 import { api } from '../../lib/api';
@@ -113,40 +113,34 @@ function OpsInner() {
           Paste an order UUID to view totals, coupon discount, and record
           refund/complaint.
         </p>
-        <div className="mt-4 flex flex-wrap items-center gap-2">
+        <div className="mt-4 flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
           <input
-            className="hb-input min-w-[16rem] flex-1"
+            className="hb-input min-w-0 w-full flex-1 basis-[16rem]"
             placeholder="Order UUID"
             value={orderId}
             onChange={(e) => setOrderId(e.target.value)}
           />
-          <button
-            type="button"
-            className="hb-icon-btn hb-icon-btn--primary"
-            aria-label="Look up order"
-            title="Look up"
+          <IconButton
+            label="Look up order"
+            tooltip="Look up"
+            tone="primary"
             onClick={() => void lookupOrder()}
           >
             {UtilityIcons.search({ size: ICON_SIZES.sm })}
-          </button>
-          <button
-            type="button"
-            className="hb-icon-btn"
-            aria-label="Record refund"
-            title="Record refund"
+          </IconButton>
+          <IconButton
+            label="Record refund"
             onClick={() => void postOrderEvent('refund')}
           >
             {UtilityIcons.refresh({ size: ICON_SIZES.sm })}
-          </button>
-          <button
-            type="button"
-            className="hb-icon-btn hb-icon-btn--danger"
-            aria-label="Record complaint"
-            title="Record complaint"
+          </IconButton>
+          <IconButton
+            label="Record complaint"
+            tone="danger"
             onClick={() => void postOrderEvent('complaint')}
           >
             {UtilityIcons.help({ size: ICON_SIZES.sm })}
-          </button>
+          </IconButton>
         </div>
 
         {orderLookup && (
@@ -237,11 +231,9 @@ function OpsInner() {
                   </td>
                   <td>
                     <div className="hb-data-table__actions">
-                      <button
-                        type="button"
-                        className="hb-icon-btn"
-                        aria-label={`Recalculate risk for ${c.name}`}
-                        title="Recalculate risk"
+                      <IconButton
+                        label={`Recalculate risk for ${c.name}`}
+                        tooltip="Recalculate risk"
                         onClick={async () => {
                           const r = await api<{ riskScore: number }>(
                             `/admin/customers/${c.id}/recalculate-risk`,
@@ -252,22 +244,21 @@ function OpsInner() {
                         }}
                       >
                         {UtilityIcons.refresh({ size: ICON_SIZES.sm })}
-                      </button>
-                      <button
-                        type="button"
-                        className={`hb-icon-btn ${c.isBlocked ? '' : 'hb-icon-btn--danger'}`}
-                        aria-label={
+                      </IconButton>
+                      <IconButton
+                        label={
                           c.isBlocked
                             ? `Unblock ${c.name}`
                             : `Block ${c.name}`
                         }
-                        title={c.isBlocked ? 'Unblock' : 'Block'}
+                        tooltip={c.isBlocked ? 'Unblock' : 'Block'}
+                        tone={c.isBlocked ? 'default' : 'danger'}
                         onClick={() => void toggleBlock(c)}
                       >
                         {c.isBlocked
                           ? UtilityIcons.unlock({ size: ICON_SIZES.sm })
                           : UtilityIcons.ban({ size: ICON_SIZES.sm })}
-                      </button>
+                      </IconButton>
                     </div>
                   </td>
                 </tr>
@@ -288,24 +279,20 @@ function OpsInner() {
             Page {pageSafe} of {totalPages}
           </span>
           <div className="hb-pagination__controls">
-            <button
-              type="button"
-              className="hb-icon-btn"
-              aria-label="Previous page"
+            <IconButton
+              label="Previous page"
               disabled={pageSafe <= 1}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
             >
               {UtilityIcons.chevronLeft({ size: ICON_SIZES.sm })}
-            </button>
-            <button
-              type="button"
-              className="hb-icon-btn"
-              aria-label="Next page"
+            </IconButton>
+            <IconButton
+              label="Next page"
               disabled={pageSafe >= totalPages}
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             >
               {UtilityIcons.chevronRight({ size: ICON_SIZES.sm })}
-            </button>
+            </IconButton>
           </div>
         </div>
       </section>

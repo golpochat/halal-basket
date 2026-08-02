@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
+  IconButton,
   SearchInput,
   LocationSelect,
   UtilityIcons,
@@ -52,10 +53,8 @@ export function AppHeader({ areas, showNavSearch = false }: AppHeaderProps) {
             <BrandLogo size="lg" />
           </Link>
 
-          <button
-            type="button"
-            className="hb-icon-btn"
-            aria-label={
+          <IconButton
+            label={
               menuExpanded ? 'Collapse categories' : 'Expand categories'
             }
             aria-expanded={menuExpanded}
@@ -73,7 +72,7 @@ export function AppHeader({ areas, showNavSearch = false }: AppHeaderProps) {
                 {UtilityIcons.menu({ size: ICON_SIZES.sm })}
               </span>
             </span>
-          </button>
+          </IconButton>
         </div>
 
         {areas.length > 0 && (

@@ -1,14 +1,20 @@
 import {
-  Body,
   Controller,
   Get,
+  MessageEvent,
   Param,
   ParseUUIDPipe,
   Post,
+  Sse,
   UseGuards,
+  Body,
 } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import { UserRole } from '@prisma/client';
+import { Observable, interval, merge, from } from 'rxjs';
+import { map, switchMap } from 'rxjs/operators';
 import { OrdersService } from './orders.service';
+import { OrderLiveHub } from './order-live.hub';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -20,7 +26,10 @@ import {
 
 @Controller()
 export class OrdersController {
-  constructor(private readonly orders: OrdersService) {}
+  constructor(
+    private readonly orders: OrdersService,
+    private readonly liveHub: OrderLiveHub,
+  ) {}
 
   @Post('orders')
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -61,12 +70,77 @@ export class OrdersController {
 
   @Get('orders/:id/live')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.customer, UserRole.admin, UserRole.super_admin)
+  @Roles(
+    UserRole.customer,
+    UserRole.driver,
+    UserRole.shop,
+    UserRole.admin,
+    UserRole.super_admin,
+  )
   live(
     @CurrentUser() user: JwtPayloadUser,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.orders.getStatusSnapshot(id, user.userId, user.role);
+  }
+
+  /**
+   * Server-Sent Events stream — pushes a status snapshot on connect and
+   * whenever driver/shop updates the order. Heartbeat keeps proxies alive.
+   */
+  @Sse('orders/:id/live/stream')
+  @SkipThrottle()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(
+    UserRole.customer,
+    UserRole.driver,
+    UserRole.shop,
+    UserRole.admin,
+    UserRole.super_admin,
+  )
+  liveStream(
+    @CurrentUser() user: JwtPayloadUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Observable<MessageEvent> {
+    return from(
+      this.orders.assertCanWatchLive(id, user.userId, user.role),
+    ).pipe(
+      switchMap(() => {
+        const initial$ = from(
+          this.orders.getStatusSnapshot(id, user.userId, user.role),
+        ).pipe(
+          map(
+            (snapshot) =>
+              ({
+                type: 'status',
+                data: snapshot,
+              }) as MessageEvent,
+          ),
+        );
+
+        const updates$ = this.liveHub.watch(id).pipe(
+          map(
+            (snapshot) =>
+              ({
+                type: 'status',
+                data: snapshot,
+              }) as MessageEvent,
+          ),
+        );
+
+        const heartbeat$ = interval(15_000).pipe(
+          map(
+            () =>
+              ({
+                type: 'ping',
+                data: { ok: true, at: new Date().toISOString() },
+              }) as MessageEvent,
+          ),
+        );
+
+        return merge(initial$, updates$, heartbeat$);
+      }),
+    );
   }
 
   @Get('customers/me/orders')

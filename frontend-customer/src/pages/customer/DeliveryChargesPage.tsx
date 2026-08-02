@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { toastError } from '@halal-basket/web';
 import { InfoPageShell } from '../../components/layout/InfoPageShell';
 import { api } from '../../lib/api';
 import {
@@ -9,14 +10,11 @@ import {
 
 export function DeliveryChargesPage() {
   const [config, setConfig] = useState<DeliveryFeeConfig | null>(null);
-  const [error, setError] = useState('');
 
   useEffect(() => {
     api<DeliveryFeeConfig>('/platform/delivery-config')
       .then(setConfig)
-      .catch((e) =>
-        setError(e instanceof Error ? e.message : 'Failed to load charges'),
-      );
+      .catch((e) => toastError(e, 'Could not load delivery charges'));
   }, []);
 
   const areaRows = useMemo(() => {
@@ -35,13 +33,7 @@ export function DeliveryChargesPage() {
       title="Delivery charges"
       subtitle="Live Halal Basket fees from platform settings. Confirmed again at checkout."
     >
-      {error && (
-        <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
-          {error}
-        </p>
-      )}
-
-      {!config && !error && (
+      {!config && (
         <p className="text-sm text-[var(--hb-ink)]/55">Loading charges…</p>
       )}
 

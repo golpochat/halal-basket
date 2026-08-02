@@ -1,5 +1,6 @@
 import { FormEvent, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { formatUserFacingError, toastError } from '@halal-basket/web';
 import { PasswordInput } from '../../components/ui/PasswordInput';
 import { SiteHeader } from '../../components/layout/SiteHeader';
 import { SiteFooter } from '../../components/layout/SiteFooter';
@@ -7,6 +8,11 @@ import { LocalePickers } from '../../components/LocalePickers';
 import { useAuth } from '../../auth/AuthContext';
 import { GuestOnly } from '../../auth/guards';
 import { api, AuthSession } from '../../lib/api';
+
+function showFormError(message: string) {
+  toastError(message);
+  return message;
+}
 
 export function CustomerRegisterPage() {
   return (
@@ -30,11 +36,11 @@ function RegisterForm() {
 
   function validateStep1() {
     if (name.trim().length < 2) {
-      setError('Please enter your full name');
+      setError(showFormError('Please enter your full name'));
       return false;
     }
     if (!email.includes('@')) {
-      setError('Enter a valid email');
+      setError(showFormError('Enter a valid email'));
       return false;
     }
     setError('');
@@ -44,11 +50,11 @@ function RegisterForm() {
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (password.length < 8) {
-      setError('Password must be at least 8 characters');
+      setError(showFormError('Password must be at least 8 characters'));
       return;
     }
     if (password !== confirm) {
-      setError('Passwords do not match');
+      setError(showFormError('Passwords do not match'));
       return;
     }
     setLoading(true);
@@ -62,7 +68,9 @@ function RegisterForm() {
       const next = params.get('next');
       navigate(next?.startsWith('/') ? next : '/');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Registration failed');
+      const msg = formatUserFacingError(err, 'Registration failed');
+      setError(msg);
+      toastError(msg);
     } finally {
       setLoading(false);
     }

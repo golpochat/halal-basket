@@ -5,6 +5,7 @@ import { useAuth } from '../../auth/AuthContext';
 import { SiteHeader } from '../../components/layout/SiteHeader';
 import { SiteFooter } from '../../components/layout/SiteFooter';
 import { LocalePickers } from '../../components/LocalePickers';
+import { formatUserFacingError, toastError, toastSuccess } from '@halal-basket/web';
 import { api } from '../../lib/api';
 
 type Order = {
@@ -21,6 +22,7 @@ type Order = {
     id: string;
     status: string;
     deliveryDate: string | null;
+    estimatedDeliveryAt?: string | null;
     shop?: { name: string; address?: string | null };
   }>;
 };
@@ -72,7 +74,11 @@ function ConfirmationInner() {
     }
 
     refresh().catch((e) => {
-      if (!cancelled) setError(e.message);
+      if (!cancelled) {
+        const msg = formatUserFacingError(e, 'Could not load order');
+        setError(msg);
+        toastError(msg);
+      }
     });
 
     // After Stripe Checkout return, webhook may lag a second or two.
@@ -123,13 +129,18 @@ function ConfirmationInner() {
           body: JSON.stringify({ paymentIntentId: intent.paymentIntentId }),
         });
         setPayMsg('Payment confirmed');
+        toastSuccess('Payment confirmed');
         setOrder(await load(id));
         return;
       }
 
-      setError('Unsupported payment response');
+      const msg = 'Payment could not be started. Please try again.';
+      setError(msg);
+      toastError(msg);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Payment failed');
+      const msg = formatUserFacingError(e, 'Payment failed');
+      setError(msg);
+      toastError(msg);
     } finally {
       setPaying(false);
     }
@@ -209,12 +220,35 @@ function ConfirmationInner() {
               </button>
             )}
             <div className="space-y-2 border-t border-[rgba(26,92,58,0.1)] pt-3">
-              {order.fulfillments.map((f) => (
+              {order.fulfillments.length > 1 && (
+                <p className="text-xs text-[var(--hb-ink)]/55">
+                  This order is split across {order.fulfillments.length}{' '}
+                  deliveries from Halal Basket.
+                </p>
+              )}
+              {order.fulfillments.map((f, index) => (
                 <div key={f.id} className="text-sm">
-                  <p>Halal Basket · {f.status}</p>
+                  <p>
+                    {order.fulfillments.length > 1
+                      ? `Part ${index + 1} of ${order.fulfillments.length}`
+                      : 'Halal Basket'}{' '}
+                    · {f.status}
+                  </p>
                   {order.fulfillmentMode === 'pickup' && f.shop?.address && (
                     <p className="mt-1 text-[var(--hb-ink)]/65">
                       Pickup location: {f.shop.address}
+                    </p>
+                  )}
+                  {f.estimatedDeliveryAt && (
+                    <p className="mt-1 text-[var(--hb-ink)]/65">
+                      ETA:{' '}
+                      {new Date(f.estimatedDeliveryAt).toLocaleString()}
+                    </p>
+                  )}
+                  {f.deliveryDate && (
+                    <p className="mt-1 text-[var(--hb-ink)]/65">
+                      Delivery:{' '}
+                      {new Date(f.deliveryDate).toLocaleDateString()}
                     </p>
                   )}
                 </div>

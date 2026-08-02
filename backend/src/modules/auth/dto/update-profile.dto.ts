@@ -1,4 +1,15 @@
-import { IsEmail, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsEmail,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+  ValidateNested,
+} from 'class-validator';
+import { CustomerAddressDto } from './customer-address.dto';
 
 export class UpdateProfileDto {
   @IsOptional()
@@ -29,4 +40,12 @@ export class UpdateProfileDto {
   @IsString()
   @MinLength(8)
   newPassword?: string;
+
+  /** Customer saved addresses. Omit to leave unchanged; send [] to clear. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(10)
+  @ValidateNested({ each: true })
+  @Type(() => CustomerAddressDto)
+  addressList?: CustomerAddressDto[];
 }

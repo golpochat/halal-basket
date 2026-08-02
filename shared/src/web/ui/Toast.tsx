@@ -1,9 +1,12 @@
+import { createPortal } from 'react-dom';
 import { useToastStore } from '../store/toast-store';
 
 export function ToastViewport() {
   const items = useToastStore((s) => s.items);
 
-  return (
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
     <div className="hb-toast-viewport" aria-live="polite">
       {items.map((t) => (
         <div
@@ -14,6 +17,7 @@ export function ToastViewport() {
           {t.message}
         </div>
       ))}
-    </div>
+    </div>,
+    document.body,
   );
 }

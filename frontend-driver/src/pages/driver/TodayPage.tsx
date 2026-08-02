@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ICON_SIZES, UtilityIcons } from '@halal-basket/web';
+import {
+  ICON_SIZES,
+  IconButton,
+  StatusBadge,
+  Tooltip,
+  UtilityIcons,
+  formatFulfillmentMode,
+  toastError,
+} from '@halal-basket/web';
 import { useAuth } from '../../auth/AuthContext';
 import { api } from '../../lib/api';
 
@@ -21,7 +29,6 @@ const PAGE_SIZE = 10;
 export function DriverTodayPage() {
   const { session } = useAuth();
   const [orders, setOrders] = useState<Fulfillment[]>([]);
-  const [error, setError] = useState('');
   const [page, setPage] = useState(1);
 
   async function refresh() {
@@ -32,7 +39,7 @@ export function DriverTodayPage() {
   }
 
   useEffect(() => {
-    refresh().catch((e) => setError(e.message));
+    refresh().catch((e) => toastError(e, "Could not load today's deliveries"));
   }, [session]);
 
   const totalPages = Math.max(1, Math.ceil(orders.length / PAGE_SIZE));
@@ -52,22 +59,18 @@ export function DriverTodayPage() {
         <p className="text-sm text-[var(--hb-ink)]/55">
           {orders.length} deliveries today · {PAGE_SIZE} per page
         </p>
-        <button
-          type="button"
-          className="hb-icon-btn"
-          aria-label="Refresh deliveries"
-          title="Refresh"
-          onClick={() => refresh().catch((e) => setError(e.message))}
+        <IconButton
+          label="Refresh deliveries"
+          tooltip="Refresh"
+          onClick={() =>
+            refresh().catch((e) =>
+              toastError(e, "Could not refresh today's deliveries"),
+            )
+          }
         >
           {UtilityIcons.refresh({ size: ICON_SIZES.sm })}
-        </button>
+        </IconButton>
       </div>
-
-      {error && (
-        <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
-          {error}
-        </p>
-      )}
 
       <div className="hb-data-table-wrap">
         <table className="hb-data-table">
@@ -86,25 +89,26 @@ export function DriverTodayPage() {
                 <td className="font-semibold">
                   {f.order.customer?.name ?? 'Customer'}
                 </td>
-                <td className="font-medium text-[var(--hb-green)]">
-                  {f.status.replaceAll('_', ' ')}
+                <td>
+                  <StatusBadge status={f.status} />
                 </td>
                 <td className="text-[var(--hb-ink)]/65">
                   {f.shop?.name ?? 'Shop'}
                 </td>
                 <td className="text-[var(--hb-ink)]/65">
-                  {f.order.fulfillmentMode.replaceAll('_', ' ')}
+                  {formatFulfillmentMode(f.order.fulfillmentMode)}
                 </td>
                 <td>
                   <div className="hb-data-table__actions">
-                    <Link
-                      to={`/driver/orders/${f.id}`}
-                      className="hb-icon-btn"
-                      aria-label={`View delivery for ${f.order.customer?.name ?? 'customer'}`}
-                      title="View detail"
-                    >
-                      {UtilityIcons.chevronRight({ size: ICON_SIZES.sm })}
-                    </Link>
+                    <Tooltip content="View detail">
+                      <Link
+                        to={`/driver/orders/${f.id}`}
+                        className="hb-icon-btn"
+                        aria-label={`View delivery for ${f.order.customer?.name ?? 'customer'}`}
+                      >
+                        {UtilityIcons.chevronRight({ size: ICON_SIZES.sm })}
+                      </Link>
+                    </Tooltip>
                   </div>
                 </td>
               </tr>
@@ -125,24 +129,20 @@ export function DriverTodayPage() {
           Page {pageSafe} of {totalPages}
         </span>
         <div className="hb-pagination__controls">
-          <button
-            type="button"
-            className="hb-icon-btn"
-            aria-label="Previous page"
+          <IconButton
+            label="Previous page"
             disabled={pageSafe <= 1}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
           >
             {UtilityIcons.chevronLeft({ size: ICON_SIZES.sm })}
-          </button>
-          <button
-            type="button"
-            className="hb-icon-btn"
-            aria-label="Next page"
+          </IconButton>
+          <IconButton
+            label="Next page"
             disabled={pageSafe >= totalPages}
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
           >
             {UtilityIcons.chevronRight({ size: ICON_SIZES.sm })}
-          </button>
+          </IconButton>
         </div>
       </div>
     </div>

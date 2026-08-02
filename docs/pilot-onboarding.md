@@ -89,6 +89,41 @@ POST /orders                    + holdId + optional couponCode
 **Browser UAT:** OOS area-change + shop/driver/ops logins — **OK**.  
 **Second shop:** Swords Halal Market onboarded (`shop2@` / `driver2@`); Swords orders route there; Demo Shop does not see them — **OK**.
 
+### Phase D — realtime, multi-shop, live status
+
+Flags in `backend/.env` (restart API after change). Defaults in [`.env.example`](../.env.example) stay **off** except local pilot may enable realtime.
+
+| Flag / setting | Local Phase D | Notes |
+|----------------|---------------|--------|
+| `FEATURE_REALTIME_DELIVERY` | `true` (local) | Checkout shows Realtime; zone + stock + `REALTIME_MAX_RISK_SCORE` gate |
+| `REALTIME_ETA_MINUTES` | `60` | ETA on fulfillment `estimatedDeliveryAt` (min 15) |
+| `FEATURE_MULTI_SHOP` | `false` by default | Set `true` only for split smoke; turn off to reject splits instantly |
+
+**D1 realtime smoke (API):**
+
+1. `GET /features` → `realtimeDelivery: true`, `realtimeEtaMinutes: 60`
+2. Register customer → Lucan catalogue → `POST /orders/route-preview` with `fulfillmentMode: realtime_delivery`
+3. `POST /orders/stock-hold` → `POST /orders` with `holdId`
+4. `GET /orders/:id/live` → mode `realtime_delivery`, ETA ~now+ETA minutes; shop-portal sees fulfillment
+
+**Verified (local API, 2026-08-02):** Lucan realtime → Demo Shop fulfillment + live ETA.
+
+**D2 multi-shop smoke (local only):**
+
+1. `FEATURE_MULTI_SHOP=true`, restart API
+2. Stock fixture (Demo rice-only / Swords chicken-only):  
+   `node backend/scripts/phase-d2-split-fixture.js apply`
+3. Basket rice + chicken, area **Swords** → place scheduled (or realtime) → **≥2 fulfillments**
+4. `shop@` sees only Demo slice; `shop2@` sees only Swords slice (`GET /shop-portal/orders`)
+5. Set `FEATURE_MULTI_SHOP=false`, restart → same basket → hold/place fails with “enable FEATURE_MULTI_SHOP”
+6. Restore stock: `node backend/scripts/phase-d2-split-fixture.js restore`
+
+**Verified (local API, 2026-08-02):** split order (2 parts) + shop isolation + flag-off reject.
+
+**D3 live status:** Customer My orders detail polls `GET /orders/:id/live` every **5s**, pauses when the tab is hidden. Payload includes `status`, `paymentStatus`, `splitOrder`, per-fulfillment `part` / `partsTotal` / ETA. **No WebSockets yet** — polling is the pilot path; Nest gateway is later hardening.
+
+Customer UX: confirmation + orders show “Part N of M” (brand-safe Halal Basket copy, not partner shop names on customer surfaces).
+
 ### Reminder — Stripe test keys (blocked)
 
 You said you’ll provide Stripe **test** keys later. Until then, keep `PAYMENT_PROVIDER=mock`.  

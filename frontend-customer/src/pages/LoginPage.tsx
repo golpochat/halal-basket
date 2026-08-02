@@ -6,6 +6,7 @@ import { SiteFooter } from '../components/layout/SiteFooter';
 import { LocalePickers } from '../components/LocalePickers';
 import { useAuth } from '../auth/AuthContext';
 import { GuestOnly } from '../auth/guards';
+import { formatUserFacingError, toastError } from '@halal-basket/web';
 import {
   api,
   AuthSession,
@@ -54,7 +55,9 @@ function LoginForm() {
       setSession(result);
       navigate(dest);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not sign in');
+      const msg = formatUserFacingError(err, 'Could not sign in');
+      setError(msg);
+      toastError(msg);
     } finally {
       setLoading(false);
     }

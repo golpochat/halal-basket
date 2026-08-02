@@ -25,11 +25,19 @@ export class FeatureFlagsService {
     return Number.isFinite(n) ? n : 50;
   }
 
+  /** Minutes from now used for realtime estimatedDeliveryAt. */
+  realtimeEtaMinutes(): number {
+    const n = Number(this.config.get<string>('REALTIME_ETA_MINUTES') ?? '60');
+    if (!Number.isFinite(n) || n < 15) return 60;
+    return Math.min(Math.floor(n), 24 * 60);
+  }
+
   snapshot() {
     return {
       realtimeDelivery: this.isRealtimeEnabled(),
       multiShop: this.isMultiShopEnabled(),
       realtimeMaxRiskScore: this.realtimeMaxRiskScore(),
+      realtimeEtaMinutes: this.realtimeEtaMinutes(),
     };
   }
 }

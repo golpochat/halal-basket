@@ -14,6 +14,8 @@ import {
   type UtilityIconName,
 } from '../../../icons';
 import { AccountMenu } from './AccountMenu';
+import { IconButton } from './IconButton';
+import { Tooltip } from './Tooltip';
 
 export type DashboardNavItem = {
   to: string;
@@ -152,42 +154,53 @@ export function DashboardShell({
 
         <aside className="hb-dashboard__sidebar" aria-label="Sidebar">
           <div className="hb-dashboard__sidebar-brand">
-            <Link
-              to={homeTo}
-              aria-label="Home"
-              className="hb-dashboard__sidebar-brand-link"
-              onClick={() => setMobileOpen(false)}
-              title={brandLabel ?? 'Home'}
+            <Tooltip
+              content={brandLabel ?? 'Home'}
+              disabled={!collapsed}
+              block
             >
-              <span className="hb-dashboard__brand-full">{brand}</span>
-              <span className="hb-dashboard__brand-mini">
-                {brandCollapsed ?? brand}
-              </span>
-              {brandLabel ? (
-                <span className="hb-dashboard__brand-label">{brandLabel}</span>
-              ) : null}
-            </Link>
+              <Link
+                to={homeTo}
+                aria-label="Home"
+                className="hb-dashboard__sidebar-brand-link"
+                onClick={() => setMobileOpen(false)}
+              >
+                <span className="hb-dashboard__brand-full">{brand}</span>
+                <span className="hb-dashboard__brand-mini">
+                  {brandCollapsed ?? brand}
+                </span>
+                {brandLabel ? (
+                  <span className="hb-dashboard__brand-label">{brandLabel}</span>
+                ) : null}
+              </Link>
+            </Tooltip>
           </div>
           <nav className="hb-dashboard__sidebar-nav" aria-label="Dashboard">
             {nav.map((item) => {
               const iconName = item.icon ?? 'grid';
               const Icon = UtilityIcons[iconName] ?? UtilityIcons.grid;
               return (
-                <NavLink
+                <Tooltip
                   key={item.to}
-                  to={item.to}
-                  end={item.end}
-                  title={item.label}
-                  className={({ isActive }) =>
-                    `hb-dashboard__nav-link${isActive ? ' is-active' : ''}`
-                  }
-                  onClick={() => setMobileOpen(false)}
+                  content={item.label}
+                  disabled={!collapsed}
+                  side="right"
+                  block
                 >
-                  <span className="hb-dashboard__nav-icon" aria-hidden>
-                    {Icon({ size: ICON_SIZES.sm })}
-                  </span>
-                  <span className="hb-dashboard__nav-label">{item.label}</span>
-                </NavLink>
+                  <NavLink
+                    to={item.to}
+                    end={item.end}
+                    className={({ isActive }) =>
+                      `hb-dashboard__nav-link${isActive ? ' is-active' : ''}`
+                    }
+                    onClick={() => setMobileOpen(false)}
+                  >
+                    <span className="hb-dashboard__nav-icon" aria-hidden>
+                      {Icon({ size: ICON_SIZES.sm })}
+                    </span>
+                    <span className="hb-dashboard__nav-label">{item.label}</span>
+                  </NavLink>
+                </Tooltip>
               );
             })}
           </nav>
@@ -197,10 +210,9 @@ export function DashboardShell({
           <header className="hb-dashboard__header">
             <div className="hb-dashboard__header-row">
               <div className="hb-dashboard__header-left">
-                <button
-                  type="button"
-                  className="hb-icon-btn hb-dashboard__menu-btn"
-                  aria-label={menuExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
+                <IconButton
+                  className="hb-dashboard__menu-btn"
+                  label={menuExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
                   aria-expanded={menuExpanded}
                   onClick={toggleSidebar}
                 >
@@ -215,7 +227,7 @@ export function DashboardShell({
                       {UtilityIcons.menu({ size: ICON_SIZES.sm })}
                     </span>
                   </span>
-                </button>
+                </IconButton>
                 <h1 className="hb-dashboard__page-title">{headerTitle}</h1>
               </div>
 

@@ -85,6 +85,8 @@ export class ShopPortalService {
       orderStatus,
     });
 
+    await this.orders.notifyLive(fulfillment.orderId);
+
     return updated;
   }
 

@@ -1,5 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ICON_SIZES, UtilityIcons } from '@halal-basket/web';
+import {
+  ICON_SIZES,
+  IconButton,
+  UtilityIcons,
+  toastError,
+  toastSuccess,
+} from '@halal-basket/web';
 import { useAuth } from '../../auth/AuthContext';
 import { api } from '../../lib/api';
 
@@ -18,8 +24,6 @@ export function ShopProductsPage() {
   const { session } = useAuth();
   const token = session!.accessToken;
   const [products, setProducts] = useState<ShopProduct[]>([]);
-  const [error, setError] = useState('');
-  const [msg, setMsg] = useState('');
   const [page, setPage] = useState(1);
   const [drafts, setDrafts] = useState<
     Record<string, { price: string; qty: string; inStock: boolean }>
@@ -44,7 +48,7 @@ export function ShopProductsPage() {
   }
 
   useEffect(() => {
-    refresh().catch((e) => setError(e.message));
+    refresh().catch((e) => toastError(e, 'Could not load products'));
   }, [token]);
 
   const totalPages = Math.max(1, Math.ceil(products.length / PAGE_SIZE));
@@ -71,8 +75,6 @@ export function ShopProductsPage() {
   async function save(sp: ShopProduct) {
     const draft = drafts[sp.id];
     if (!draft) return;
-    setError('');
-    setMsg('');
     try {
       await api(`/shop-portal/products/${sp.id}`, {
         method: 'PATCH',
@@ -84,9 +86,9 @@ export function ShopProductsPage() {
         }),
       });
       await refresh();
-      setMsg('Saved');
+      toastSuccess('Product saved');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Save failed');
+      toastError(e, 'Could not save product');
     }
   }
 
@@ -98,27 +100,16 @@ export function ShopProductsPage() {
           stock) to stop selling. · {products.length} total · {PAGE_SIZE} per
           page
         </p>
-        <button
-          type="button"
-          className="hb-icon-btn"
-          aria-label="Refresh products"
-          title="Refresh"
-          onClick={() => refresh().catch((e) => setError(e.message))}
+        <IconButton
+          label="Refresh products"
+          tooltip="Refresh"
+          onClick={() =>
+            refresh().catch((e) => toastError(e, 'Could not refresh products'))
+          }
         >
           {UtilityIcons.refresh({ size: ICON_SIZES.sm })}
-        </button>
+        </IconButton>
       </div>
-
-      {error && (
-        <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
-          {error}
-        </p>
-      )}
-      {msg && (
-        <p className="mb-3 rounded-lg bg-[var(--hb-mist)] px-3 py-2 text-sm text-[var(--hb-green)]">
-          {msg}
-        </p>
-      )}
 
       <div className="hb-data-table-wrap">
         <table className="hb-data-table">
@@ -221,24 +212,20 @@ export function ShopProductsPage() {
           Page {pageSafe} of {totalPages}
         </span>
         <div className="hb-pagination__controls">
-          <button
-            type="button"
-            className="hb-icon-btn"
-            aria-label="Previous page"
+          <IconButton
+            label="Previous page"
             disabled={pageSafe <= 1}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
           >
             {UtilityIcons.chevronLeft({ size: ICON_SIZES.sm })}
-          </button>
-          <button
-            type="button"
-            className="hb-icon-btn"
-            aria-label="Next page"
+          </IconButton>
+          <IconButton
+            label="Next page"
             disabled={pageSafe >= totalPages}
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
           >
             {UtilityIcons.chevronRight({ size: ICON_SIZES.sm })}
-          </button>
+          </IconButton>
         </div>
       </div>
     </div>

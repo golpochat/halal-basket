@@ -30,6 +30,23 @@ export class DriverController {
     return this.driverService.todaysOrders(user.userId, user.role);
   }
 
+  @Get('orders/history')
+  history(@CurrentUser() user: JwtPayloadUser) {
+    return this.driverService.orderHistory(user.userId, user.role);
+  }
+
+  @Get('orders/:fulfillmentId')
+  one(
+    @CurrentUser() user: JwtPayloadUser,
+    @Param('fulfillmentId', ParseUUIDPipe) fulfillmentId: string,
+  ) {
+    return this.driverService.getAssignedOrder(
+      user.userId,
+      user.role,
+      fulfillmentId,
+    );
+  }
+
   @Patch('orders/:fulfillmentId/status')
   updateStatus(
     @CurrentUser() user: JwtPayloadUser,
@@ -40,7 +57,7 @@ export class DriverController {
       user.userId,
       user.role,
       fulfillmentId,
-      dto.status,
+      dto,
     );
   }
 

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { toastError } from '@halal-basket/web';
 import { useAuth } from '../../auth/AuthContext';
 import { api } from '../../lib/api';
 
@@ -12,27 +13,22 @@ type Fulfillment = {
 export function ShopDashboardPage() {
   const { session } = useAuth();
   const [orders, setOrders] = useState<Fulfillment[]>([]);
-  const [error, setError] = useState('');
 
   useEffect(() => {
     api<Fulfillment[]>('/shop-portal/orders', {
       token: session!.accessToken,
     })
       .then(setOrders)
-      .catch((e) => setError(e.message));
+      .catch((e) => toastError(e, 'Could not load dashboard'));
   }, [session]);
 
   const open = orders.filter(
-    (o) => !['delivered', 'cancelled'].includes(o.status),
+    (o) =>
+      !['delivered', 'failed_attempt', 'cancelled'].includes(o.status),
   );
 
   return (
     <div>
-      {error && (
-        <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
-          {error}
-        </p>
-      )}
       <div className="grid gap-4 sm:grid-cols-3">
         <Stat label="Open fulfillments" value={String(open.length)} />
         <Stat label="Total today" value={String(orders.length)} />

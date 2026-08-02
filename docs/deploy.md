@@ -70,8 +70,10 @@ Do this before a real shop UAT. Prefer any host (Railway, Fly, Render, VPS); the
 | `STRIPE_SECRET_KEY` | `sk_test_…` |
 | `STRIPE_PUBLISHABLE_KEY` | `pk_test_…` |
 | `STRIPE_WEBHOOK_SECRET` | `whsec_…` from Stripe Staging endpoint |
-| `FEATURE_REALTIME_DELIVERY` | `false` until Phase D |
-| `FEATURE_MULTI_SHOP` | `false` until Phase D |
+| `FEATURE_REALTIME_DELIVERY` | `false` until Staging UAT for realtime (local may use `true`) |
+| `FEATURE_MULTI_SHOP` | `false` until split orders proven (keep off in Staging/Prod) |
+| `REALTIME_ETA_MINUTES` | `60` (optional; used when realtime is on) |
+| `REALTIME_MAX_RISK_SCORE` | `50` (0 disables risk gate) |
 
 ### 3. Migrate + boot
 
@@ -133,14 +135,28 @@ stripe listen --forward-to localhost:3000/payments/webhook/stripe
 
 Then repeat payment smoke on `http://localhost:5173`.
 
+## Phase D flags (realtime / multi-shop / live)
+
+| Variable | Safe default | When to enable |
+|----------|--------------|----------------|
+| `FEATURE_REALTIME_DELIVERY` | `false` | After zone + stock + risk smoke (see [pilot-onboarding.md](./pilot-onboarding.md) § Phase D) |
+| `FEATURE_MULTI_SHOP` | `false` | Only after split UAT; **never** enable in Production until proven |
+| `REALTIME_ETA_MINUTES` | `60` | Ops tune without code change |
+| `REALTIME_MAX_RISK_SCORE` | `50` | Reject realtime when customer `riskScore` ≥ value (`0` = off) |
+
+Live order status for customers is **HTTP polling** (`GET /orders/:id/live`, ~5s). WebSockets / Nest gateway are **not** required for Phase D exit criteria.
+
+`GET /features` exposes the flag snapshot (`realtimeDelivery`, `multiShop`, `realtimeEtaMinutes`, `realtimeMaxRiskScore`) for checkout UI.
+
 ## Rollback
 
 1. Redeploy previous image/commit
 2. Do **not** reverse migrations unless a dedicated down migration is prepared and reviewed
 3. Payments: set `PAYMENT_PROVIDER=mock` only as emergency local/dev fallback — never in Production with real orders unpaid expectation mismatch
+4. Phase D: set `FEATURE_REALTIME_DELIVERY=false` and/or `FEATURE_MULTI_SHOP=false` and restart — splits and realtime disable immediately
 
 ## Related
 
-- Pilot dry-run: [pilot-onboarding.md](./pilot-onboarding.md)
+- Pilot dry-run + Phase D smokes: [pilot-onboarding.md](./pilot-onboarding.md)
 - Incidents / payment alerts: [incident.md](./incident.md)
 - Seed accounts (local/Staging seed only): [seed-credentials.md](./seed-credentials.md)

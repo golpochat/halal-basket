@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { SelectInput } from '@halal-basket/web';
 import { RequireAuth, RequireRole } from '../../auth/guards';
 import { useAuth } from '../../auth/AuthContext';
 import { api } from '../../lib/api';
@@ -152,22 +153,27 @@ function PromotionsInner() {
                         )
                       }
                     />
-                    <select
-                      className="hb-input"
+                    <SelectInput
+                      label="Discount type"
+                      showLabel={false}
                       value={row.type}
-                      onChange={(e) =>
+                      options={[
+                        { value: 'percent', label: 'Percent' },
+                        { value: 'fixed', label: 'Fixed €' },
+                      ]}
+                      onChange={(value) =>
                         setPromoCoupons((rows) =>
                           rows.map((r, i) =>
                             i === idx
-                              ? { ...r, type: e.target.value as 'percent' | 'fixed' }
+                              ? {
+                                  ...r,
+                                  type: value as 'percent' | 'fixed',
+                                }
                               : r,
                           ),
                         )
                       }
-                    >
-                      <option value="percent">Percent</option>
-                      <option value="fixed">Fixed €</option>
-                    </select>
+                    />
                     <input
                       className="hb-input"
                       type="number"

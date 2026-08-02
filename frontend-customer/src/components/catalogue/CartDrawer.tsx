@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Button,
+  IconButton,
   Modal,
   ProductImage,
   UtilityIcons,
@@ -365,17 +366,14 @@ export function CartDrawer() {
                     })}
                   </p>
                 </div>
-                <button
-                  type="button"
-                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--hb-radius)] text-[var(--hb-green)] hover:bg-[var(--hb-mist)] focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(47,143,91,0.28)]"
-                  aria-label="Collapse cart"
-                  title="Collapse cart"
+                <IconButton
+                  label="Collapse cart"
                   onClick={() => setCartOpen(false)}
                 >
                   <span className="text-xl font-medium leading-none" aria-hidden>
                     »
                   </span>
-                </button>
+                </IconButton>
               </div>
               {lines.length > 0 && (
                 <div className="mt-2 flex flex-wrap items-center justify-end gap-3">

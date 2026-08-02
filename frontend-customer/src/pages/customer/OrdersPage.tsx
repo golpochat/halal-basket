@@ -1,27 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   ICON_SIZES,
+  IconButton,
+  Tooltip,
   UtilityIcons,
+  toastError,
+  useCartStore,
   useDashboardTitle,
+  useOrderLive,
+  useToastStore,
 } from '@halal-basket/web';
 import { useAuth } from '../../auth/AuthContext';
 import { api } from '../../lib/api';
-
-type LiveSnapshot = {
-  id: string;
-  status: string;
-  fulfillmentMode: string;
-  fulfillments: Array<{
-    id: string;
-    shopId: string;
-    shopName?: string;
-    shopAddress?: string | null;
-    status: string;
-    deliveryDate: string | null;
-    estimatedDeliveryAt: string | null;
-  }>;
-};
+import { loadOrderIntoCart } from '../../lib/reorder';
 
 type Order = {
   id: string;
@@ -30,6 +22,13 @@ type Order = {
   totalAmount: string | number;
   discountAmount?: string | number;
   couponCode?: string | null;
+  items?: Array<{
+    id: string;
+    productId: string;
+    quantity: number;
+    unitPrice: string | number;
+    product?: { name?: string | null; imageUrl?: string | null } | null;
+  }>;
   fulfillments: Array<{
     id: string;
     status: string;
@@ -40,16 +39,36 @@ type Order = {
 };
 
 const PAGE_SIZE = 10;
+const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
 
 export function OrdersPage() {
   const { session } = useAuth();
   const { id } = useParams();
+  const navigate = useNavigate();
+  const toast = useToastStore((s) => s.toast);
+  const setCartOpen = useCartStore((s) => s.setCartOpen);
   const [order, setOrder] = useState<Order | null>(null);
-  const [live, setLive] = useState<LiveSnapshot | null>(null);
   const [list, setList] = useState<Order[] | null>(null);
-  const [error, setError] = useState('');
   const [page, setPage] = useState(1);
   const token = session!.accessToken;
+
+  const { snapshot: live, connection, lastEventAt } = useOrderLive({
+    orderId: id,
+    token,
+    baseUrl: API_URL,
+    enabled: Boolean(id),
+  });
+
+  function onReorder(target: Order) {
+    const added = loadOrderIntoCart(target.items ?? []);
+    if (added === 0) {
+      toast('This order has no items to reorder', 'error');
+      return;
+    }
+    toast(`Added ${added} item${added === 1 ? '' : 's'} from a previous order`);
+    setCartOpen(true);
+    navigate('/');
+  }
 
   useDashboardTitle(id ? 'Order status' : '');
 
@@ -57,30 +76,12 @@ export function OrdersPage() {
     if (id) {
       api<Order>(`/orders/${id}`, { token })
         .then(setOrder)
-        .catch((e) => setError(e.message));
+        .catch((e) => toastError(e, 'Could not load this order'));
     } else {
       api<Order[]>('/customers/me/orders', { token })
         .then(setList)
-        .catch((e) => setError(e.message));
+        .catch((e) => toastError(e, 'Could not load your orders'));
     }
-  }, [id, token]);
-
-  useEffect(() => {
-    if (!id) return;
-    let cancelled = false;
-    const tick = () => {
-      api<LiveSnapshot>(`/orders/${id}/live`, { token })
-        .then((snap) => {
-          if (!cancelled) setLive(snap);
-        })
-        .catch(() => undefined);
-    };
-    tick();
-    const handle = window.setInterval(tick, 5000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(handle);
-    };
   }, [id, token]);
 
   const totalPages = Math.max(1, Math.ceil((list?.length ?? 0) / PAGE_SIZE));
@@ -97,8 +98,10 @@ export function OrdersPage() {
 
   const fulfillments =
     live?.fulfillments ??
-    order?.fulfillments.map((f) => ({
+    order?.fulfillments.map((f, index, arr) => ({
       id: f.id,
+      part: index + 1,
+      partsTotal: arr.length,
       shopId: '',
       shopName: f.shop?.name,
       shopAddress: f.shop?.address ?? null,
@@ -110,36 +113,54 @@ export function OrdersPage() {
 
   const fulfillmentMode = live?.fulfillmentMode ?? order?.fulfillmentMode;
 
+  const liveLabel =
+    connection === 'live'
+      ? 'Live · instant updates'
+      : connection === 'polling'
+        ? 'Live · polling fallback (every 5s)'
+        : connection === 'paused'
+          ? 'Paused while tab hidden'
+          : connection === 'connecting'
+            ? 'Connecting…'
+            : 'Live connection issue';
+
   if (id) {
     return (
       <div>
         <div className="mb-4">
-          <Link
-            to="/customer/orders"
-            className="hb-icon-btn inline-flex"
-            aria-label="Back to orders"
-            title="Back to orders"
-          >
-            {UtilityIcons.chevronLeft({ size: ICON_SIZES.sm })}
-          </Link>
+          <Tooltip content="Back to orders">
+            <Link
+              to="/customer/orders"
+              className="hb-icon-btn inline-flex"
+              aria-label="Back to orders"
+            >
+              {UtilityIcons.chevronLeft({ size: ICON_SIZES.sm })}
+            </Link>
+          </Tooltip>
         </div>
-
-        {error && (
-          <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
-            {error}
-          </p>
-        )}
 
         {(order || live) && (
           <div className="hb-surface space-y-3 p-6 shadow-sm">
             <p className="text-xs text-[var(--hb-ink)]/45">
-              Live updates every 5 seconds
+              {liveLabel}
+              {lastEventAt
+                ? ` · last ${new Date(lastEventAt).toLocaleTimeString()}`
+                : ''}
             </p>
             <p className="font-mono text-xs">{id}</p>
             <p>
               Order: <strong>{live?.status ?? order?.status}</strong>
+              {live?.paymentStatus
+                ? ` · Payment ${live.paymentStatus}`
+                : ''}
             </p>
             <p>Mode: {fulfillmentMode?.replaceAll('_', ' ')}</p>
+            {(live?.splitOrder || fulfillments.length > 1) && (
+              <p className="rounded-lg bg-[var(--hb-mist)] px-3 py-2 text-sm">
+                Split across {fulfillments.length} Halal Basket deliveries —
+                each part may progress on its own.
+              </p>
+            )}
             {order && (
               <>
                 {Number(order.discountAmount ?? 0) > 0 && (
@@ -155,13 +176,19 @@ export function OrdersPage() {
               </>
             )}
             <div className="space-y-2 border-t border-[rgba(26,92,58,0.1)] pt-3">
-              {fulfillments.map((f) => (
+              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--hb-ink)]/45">
+                Status timeline
+              </p>
+              {fulfillments.map((f, index) => (
                 <div
                   key={f.id}
                   className="rounded-xl bg-[var(--hb-mist)]/50 px-3 py-2 text-sm"
                 >
                   <p>
-                    Halal Basket · <strong>{f.status}</strong>
+                    {fulfillments.length > 1
+                      ? `Part ${f.part ?? index + 1} of ${f.partsTotal ?? fulfillments.length}`
+                      : 'Halal Basket'}{' '}
+                    · <strong>{f.status.replaceAll('_', ' ')}</strong>
                   </p>
                   {fulfillmentMode === 'pickup' && f.shopAddress && (
                     <p className="text-[var(--hb-ink)]/65">
@@ -191,12 +218,23 @@ export function OrdersPage() {
                 ))}
               </ul>
             )}
-            <Link
-              to="/"
-              className="inline-block text-sm font-medium text-[var(--hb-green)]"
-            >
-              ← Back to home
-            </Link>
+            <div className="flex flex-wrap gap-3 pt-1">
+              {order?.items && order.items.length > 0 ? (
+                <button
+                  type="button"
+                  className="hb-btn hb-btn-ghost h-9 px-3 text-sm"
+                  onClick={() => onReorder(order)}
+                >
+                  Reorder
+                </button>
+              ) : null}
+              <Link
+                to="/"
+                className="inline-flex h-9 items-center text-sm font-medium text-[var(--hb-green)]"
+              >
+                ← Back to home
+              </Link>
+            </div>
           </div>
         )}
       </div>
@@ -205,12 +243,6 @@ export function OrdersPage() {
 
   return (
     <div>
-      {error && (
-        <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
-          {error}
-        </p>
-      )}
-
       {list && (
         <>
           <p className="mb-3 text-sm text-[var(--hb-ink)]/55">
@@ -235,18 +267,29 @@ export function OrdersPage() {
                     <td className="font-semibold">{o.status}</td>
                     <td className="text-[var(--hb-ink)]/65">
                       {o.fulfillmentMode.replaceAll('_', ' ')}
+                      {o.fulfillments.length > 1
+                        ? ` · ${o.fulfillments.length} parts`
+                        : ''}
                     </td>
                     <td>€{Number(o.totalAmount).toFixed(2)}</td>
                     <td>
                       <div className="hb-data-table__actions">
-                        <Link
-                          to={`/customer/orders/${o.id}`}
-                          className="hb-icon-btn"
-                          aria-label={`View order ${o.id.slice(0, 8)}`}
-                          title="View order"
+                        <button
+                          type="button"
+                          className="hb-btn hb-btn-ghost h-8 px-2 text-xs"
+                          onClick={() => onReorder(o)}
                         >
-                          {UtilityIcons.chevronRight({ size: ICON_SIZES.sm })}
-                        </Link>
+                          Reorder
+                        </button>
+                        <Tooltip content="View order">
+                          <Link
+                            to={`/customer/orders/${o.id}`}
+                            className="hb-icon-btn"
+                            aria-label={`View order ${o.id.slice(0, 8)}`}
+                          >
+                            {UtilityIcons.chevronRight({ size: ICON_SIZES.sm })}
+                          </Link>
+                        </Tooltip>
                       </div>
                     </td>
                   </tr>
@@ -267,24 +310,20 @@ export function OrdersPage() {
               Page {pageSafe} of {totalPages}
             </span>
             <div className="hb-pagination__controls">
-              <button
-                type="button"
-                className="hb-icon-btn"
-                aria-label="Previous page"
+              <IconButton
+                label="Previous page"
                 disabled={pageSafe <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
               >
                 {UtilityIcons.chevronLeft({ size: ICON_SIZES.sm })}
-              </button>
-              <button
-                type="button"
-                className="hb-icon-btn"
-                aria-label="Next page"
+              </IconButton>
+              <IconButton
+                label="Next page"
                 disabled={pageSafe >= totalPages}
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               >
                 {UtilityIcons.chevronRight({ size: ICON_SIZES.sm })}
-              </button>
+              </IconButton>
             </div>
           </div>
         </>

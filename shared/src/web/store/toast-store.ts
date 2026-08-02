@@ -13,9 +13,10 @@ export const useToastStore = create<ToastState>((set) => ({
   toast: (message, tone = 'default') => {
     const id = Date.now() + Math.random();
     set((s) => ({ items: [...s.items, { id, message, tone }] }));
+    const ms = tone === 'error' ? 4200 : 2800;
     window.setTimeout(() => {
       set((s) => ({ items: s.items.filter((t) => t.id !== id) }));
-    }, 2800);
+    }, ms);
   },
   dismiss: (id) => set((s) => ({ items: s.items.filter((t) => t.id !== id) })),
 }));

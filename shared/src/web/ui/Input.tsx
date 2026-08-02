@@ -9,7 +9,6 @@ import {
   type CSSProperties,
   type InputHTMLAttributes,
   type ReactNode,
-  type SelectHTMLAttributes,
 } from 'react';
 import { createPortal } from 'react-dom';
 import { UtilityIcons } from '../icons/utility';
@@ -27,7 +26,7 @@ const CONTROL_FOCUS_BTN =
 
 /** Shared dropdown panel surface — portaled to body to avoid clip/overlap */
 const DROPDOWN_PANEL =
-  `fixed z-[80] max-h-[min(16rem,calc(100dvh-5rem))] overflow-y-auto overscroll-contain bg-white py-1 shadow-[var(--hb-shadow-lg)] ${CONTROL_RADIUS} ${CONTROL_BORDER}`;
+  `fixed z-[160] max-h-[min(16rem,calc(100dvh-5rem))] overflow-y-auto overscroll-contain bg-white py-1 shadow-[var(--hb-shadow-lg)] ${CONTROL_RADIUS} ${CONTROL_BORDER}`;
 
 const DROPDOWN_ROW = `flex w-full ${CONTROL_HEIGHT} shrink-0 items-center gap-2 whitespace-nowrap px-3 text-left text-sm font-semibold transition`;
 const DROPDOWN_ROW_IDLE = 'text-[var(--hb-ink)] hover:bg-[var(--hb-mist)]';
@@ -39,38 +38,29 @@ export function TextInput({
   label,
   className = '',
   id,
+  required,
   ...props
 }: InputHTMLAttributes<HTMLInputElement> & { label?: string }) {
   const inputId = id ?? props.name;
   return (
     <label className="block text-sm font-medium text-[var(--hb-ink)]">
-      {label && <span className="mb-1.5 block">{label}</span>}
-      <input id={inputId} className={`${fieldClass} ${className}`} {...props} />
-    </label>
-  );
-}
-
-export function SelectInput({
-  label,
-  className = '',
-  id,
-  children,
-  ...props
-}: SelectHTMLAttributes<HTMLSelectElement> & {
-  label?: string;
-  children: ReactNode;
-}) {
-  const selectId = id ?? props.name;
-  return (
-    <label className="block text-sm font-medium text-[var(--hb-ink)]">
-      {label && <span className="mb-1.5 block">{label}</span>}
-      <select
-        id={selectId}
+      {label ? (
+        <span className="mb-1.5 block">
+          {label}
+          {required ? (
+            <span className="text-[var(--hb-error)]" aria-hidden>
+              {' '}
+              *
+            </span>
+          ) : null}
+        </span>
+      ) : null}
+      <input
+        id={inputId}
         className={`${fieldClass} ${className}`}
+        required={required}
         {...props}
-      >
-        {children}
-      </select>
+      />
     </label>
   );
 }
@@ -166,7 +156,7 @@ function DropdownPortal({
     <>
       <button
         type="button"
-        className="fixed inset-0 z-[70] cursor-default bg-transparent"
+        className="fixed inset-0 z-[150] cursor-default bg-transparent"
         aria-label={`Close ${label} menu`}
         onClick={onClose}
       />
@@ -180,7 +170,7 @@ function DropdownPortal({
 
 export type MenuOption = { value: string; label: string };
 
-type MenuSelectProps = {
+export type MenuSelectProps = {
   value: string;
   options: MenuOption[];
   onChange: (value: string) => void;
@@ -242,7 +232,12 @@ export function MenuSelect({
           className="mb-1.5 block text-sm font-medium text-[var(--hb-ink)]"
         >
           {label}
-          {required ? ' *' : ''}
+          {required ? (
+            <span className="text-[var(--hb-error)]" aria-hidden>
+              {' '}
+              *
+            </span>
+          ) : null}
         </label>
       )}
       {!showLabel && <span className="sr-only">{label}</span>}
@@ -299,6 +294,183 @@ export function MenuSelect({
                       setOpen(false);
                     }}
                   >
+                    <span className="truncate">{opt.label}</span>
+                  </button>
+                </li>
+              );
+            })
+          )}
+        </ul>
+      </DropdownPortal>
+    </div>
+  );
+}
+
+/**
+ * Form dropdown — MenuSelect with labelled + full-width defaults.
+ * Prefer this (or MenuSelect / Select) over native `<select>` everywhere.
+ */
+export function SelectInput({
+  label,
+  showLabel = true,
+  fullWidth = true,
+  ...props
+}: MenuSelectProps) {
+  return (
+    <MenuSelect
+      label={label}
+      showLabel={showLabel}
+      fullWidth={fullWidth}
+      {...props}
+    />
+  );
+}
+
+/** Alias for the platform dropdown. */
+export const Select = MenuSelect;
+
+export type MenuMultiSelectProps = {
+  value: string[];
+  options: MenuOption[];
+  onChange: (value: string[]) => void;
+  label?: string;
+  showLabel?: boolean;
+  placeholder?: string;
+  className?: string;
+  triggerClassName?: string;
+  fullWidth?: boolean;
+  disabled?: boolean;
+  id?: string;
+};
+
+/**
+ * Multi-select dropdown — same chrome as MenuSelect; stays open while toggling.
+ */
+export function MenuMultiSelect({
+  value,
+  options,
+  onChange,
+  label = 'Select',
+  showLabel = false,
+  placeholder = 'Select…',
+  className = '',
+  triggerClassName = '',
+  fullWidth = false,
+  disabled,
+  id,
+}: MenuMultiSelectProps) {
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const listId = useId();
+  const autoId = useId();
+  const triggerId = id ?? autoId;
+  const pos = useAnchoredPanel(open, triggerRef, { matchTriggerWidth: true });
+  const selected = new Set(value);
+
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpen(false);
+    }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open]);
+
+  function toggle(optValue: string) {
+    if (selected.has(optValue)) {
+      onChange(value.filter((v) => v !== optValue));
+    } else {
+      onChange([...value, optValue]);
+    }
+  }
+
+  const selectedLabels = options
+    .filter((o) => selected.has(o.value))
+    .map((o) => o.label);
+  const display =
+    selectedLabels.length === 0
+      ? placeholder
+      : selectedLabels.length <= 2
+        ? selectedLabels.join(', ')
+        : `${selectedLabels.length} selected`;
+
+  return (
+    <div className={`relative ${fullWidth ? 'w-full' : 'shrink-0'} ${className}`}>
+      {showLabel && (
+        <label
+          htmlFor={triggerId}
+          className="mb-1.5 block text-sm font-medium text-[var(--hb-ink)]"
+        >
+          {label}
+        </label>
+      )}
+      {!showLabel && <span className="sr-only">{label}</span>}
+
+      <button
+        ref={triggerRef}
+        type="button"
+        id={triggerId}
+        disabled={disabled || options.length === 0}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={listId}
+        aria-label={label}
+        onClick={() => setOpen((v) => !v)}
+        className={`flex ${CONTROL_HEIGHT} items-center gap-[var(--hb-icon-gap)] ${CONTROL_RADIUS} ${CONTROL_BORDER} ${CONTROL_FOCUS_BTN} bg-white px-3 text-sm font-semibold text-[var(--hb-ink)] shadow-[var(--hb-shadow-sm)] transition hover:border-[var(--hb-leaf)] disabled:opacity-55 ${fullWidth ? 'w-full justify-between' : ''} ${triggerClassName}`}
+      >
+        <span
+          className={`min-w-0 flex-1 truncate text-left whitespace-nowrap ${selectedLabels.length === 0 ? 'text-[var(--hb-ink)]/45' : ''}`}
+        >
+          {display}
+        </span>
+        <span
+          className={`hb-icon-utility shrink-0 text-[var(--hb-ink)]/55 transition-transform ${open ? 'rotate-180' : ''}`}
+        >
+          {UtilityIcons.chevronDown({ size: 16 })}
+        </span>
+      </button>
+
+      <DropdownPortal
+        open={open}
+        onClose={() => setOpen(false)}
+        label={label}
+        panelId={listId}
+        style={
+          pos
+            ? {
+                top: pos.top,
+                left: pos.left,
+                width: pos.width,
+                minWidth: pos.minWidth,
+              }
+            : undefined
+        }
+      >
+        <ul role="listbox" aria-multiselectable aria-label={label}>
+          {options.length === 0 ? (
+            <li className={`${DROPDOWN_ROW} text-[var(--hb-ink)]/50`}>
+              No options
+            </li>
+          ) : (
+            options.map((opt) => {
+              const isSelected = selected.has(opt.value);
+              return (
+                <li key={opt.value} role="option" aria-selected={isSelected}>
+                  <button
+                    type="button"
+                    className={`${DROPDOWN_ROW} ${isSelected ? DROPDOWN_ROW_ACTIVE : DROPDOWN_ROW_IDLE}`}
+                    onClick={() => toggle(opt.value)}
+                  >
+                    <span
+                      className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded border text-[10px] ${
+                        isSelected
+                          ? 'border-[var(--hb-green)] bg-[var(--hb-green)] text-white'
+                          : 'border-[rgba(26,92,58,0.28)] bg-white'
+                      }`}
+                      aria-hidden
+                    >
+                      {isSelected ? '✓' : ''}
+                    </span>
                     <span className="truncate">{opt.label}</span>
                   </button>
                 </li>

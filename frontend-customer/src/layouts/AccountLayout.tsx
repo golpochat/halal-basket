@@ -7,6 +7,7 @@ import { BrandLogo } from '../components/brand/BrandLogo';
 const accountNav: DashboardNavItem[] = [
   { to: '/customer/dashboard', label: 'Dashboard', end: true, icon: 'home' },
   { to: '/customer/orders', label: 'My orders', icon: 'package' },
+  { to: '/customer/addresses', label: 'Addresses', icon: 'location' },
   { to: '/', label: 'Back to shop', icon: 'store' },
 ];
 

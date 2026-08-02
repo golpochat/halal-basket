@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ICON_SIZES, UtilityIcons } from '@halal-basket/web';
+import {
+  ICON_SIZES,
+  IconButton,
+  StatusBadge,
+  UtilityIcons,
+  formatFulfillmentMode,
+  toastError,
+} from '@halal-basket/web';
 import { useAuth } from '../../auth/AuthContext';
 import { api } from '../../lib/api';
 
@@ -17,7 +24,6 @@ export function ShopPrepPage() {
   const { session } = useAuth();
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [orders, setOrders] = useState<Fulfillment[]>([]);
-  const [error, setError] = useState('');
   const [page, setPage] = useState(1);
 
   useEffect(() => {
@@ -27,7 +33,7 @@ export function ShopPrepPage() {
       { token: session!.accessToken },
     )
       .then(setOrders)
-      .catch((e) => setError(e.message));
+      .catch((e) => toastError(e, 'Could not load prep list'));
   }, [session, date]);
 
   const totalPages = Math.max(1, Math.ceil(orders.length / PAGE_SIZE));
@@ -43,21 +49,15 @@ export function ShopPrepPage() {
 
   return (
     <div>
-      <label className="block max-w-xs text-sm font-medium">
+      <label className="block w-full max-w-xs text-sm font-medium">
         Delivery date
         <input
           type="date"
-          className="hb-input mt-1.5"
+          className="hb-input mt-1.5 w-full"
           value={date}
           onChange={(e) => setDate(e.target.value)}
         />
       </label>
-
-      {error && (
-        <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
-          {error}
-        </p>
-      )}
 
       <p className="mb-3 mt-4 text-sm text-[var(--hb-ink)]/55">
         {orders.length} scheduled · {PAGE_SIZE} per page
@@ -79,9 +79,11 @@ export function ShopPrepPage() {
                 <td className="font-semibold">
                   {f.order.customer?.name ?? 'Customer'}
                 </td>
-                <td>{f.status.replaceAll('_', ' ')}</td>
+                <td>
+                  <StatusBadge status={f.status} />
+                </td>
                 <td className="text-[var(--hb-ink)]/65">
-                  {f.order.fulfillmentMode.replaceAll('_', ' ')}
+                  {formatFulfillmentMode(f.order.fulfillmentMode)}
                 </td>
                 <td className="text-sm text-[var(--hb-ink)]/65">
                   {(f.items ?? []).length === 0 ? (
@@ -114,24 +116,20 @@ export function ShopPrepPage() {
           Page {pageSafe} of {totalPages}
         </span>
         <div className="hb-pagination__controls">
-          <button
-            type="button"
-            className="hb-icon-btn"
-            aria-label="Previous page"
+          <IconButton
+            label="Previous page"
             disabled={pageSafe <= 1}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
           >
             {UtilityIcons.chevronLeft({ size: ICON_SIZES.sm })}
-          </button>
-          <button
-            type="button"
-            className="hb-icon-btn"
-            aria-label="Next page"
+          </IconButton>
+          <IconButton
+            label="Next page"
             disabled={pageSafe >= totalPages}
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
           >
             {UtilityIcons.chevronRight({ size: ICON_SIZES.sm })}
-          </button>
+          </IconButton>
         </div>
       </div>
     </div>

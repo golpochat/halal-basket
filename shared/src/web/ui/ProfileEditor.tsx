@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { createApiClient } from '../api/client';
+import { toastError, toastSuccess } from '../api/errors';
 import { Button } from './Button';
 import { TextInput } from './Input';
 import { UserAvatar } from './UserAvatar';
@@ -53,9 +54,8 @@ export function ProfileEditor({
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
-  const [error, setError] = useState('');
-  const [msg, setMsg] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   useEffect(() => {
     api<UserProfile>('/auth/me', { token: accessToken })
@@ -65,33 +65,35 @@ export function ProfileEditor({
         setPhone(p.phone ?? '');
         setName(p.name ?? '');
         setAvatarUrl(p.avatarUrl ?? null);
+        setLoadFailed(false);
       })
-      .catch((e: Error) => setError(e.message));
+      .catch((e: unknown) => {
+        setLoadFailed(true);
+        toastError(e, 'Could not load your profile');
+      });
   }, [accessToken]);
 
   async function onPickFile(file: File | null) {
     if (!file) return;
-    setError('');
     if (!file.type.startsWith('image/')) {
-      setError('Please choose an image file');
+      toastError('Please choose an image file (JPG, PNG, or WebP).');
       return;
     }
     if (file.size > MAX_AVATAR_BYTES) {
-      setError('Image must be under 350KB');
+      toastError('That image is too large. Please use a photo under 350KB.');
       return;
     }
     try {
       const dataUrl = await readFileAsDataUrl(file);
       setAvatarUrl(dataUrl);
+      toastSuccess('Photo ready — save changes to apply it');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not read image');
+      toastError(e, 'Could not read that image');
     }
   }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    setError('');
-    setMsg('');
     setLoading(true);
     try {
       const body: Record<string, string> = {
@@ -129,22 +131,30 @@ export function ProfileEditor({
         accessToken: res.accessToken,
         user: res.user,
       });
-      setMsg('Profile saved');
+      toastSuccess('Profile saved');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not save profile');
+      toastError(err, 'Could not save your profile');
     } finally {
       setLoading(false);
     }
   }
 
-  if (!profile && !error) {
+  if (!profile && !loadFailed) {
     return <p className="text-sm text-[var(--hb-ink)]/55">Loading profile…</p>;
+  }
+
+  if (!profile && loadFailed) {
+    return (
+      <p className="text-sm text-[var(--hb-ink)]/55">
+        Could not load profile. Please refresh the page.
+      </p>
+    );
   }
 
   return (
     <form
       onSubmit={onSubmit}
-      className="hb-surface mx-auto max-w-xl space-y-5 p-6 shadow-sm"
+      className="hb-surface w-full space-y-5 p-4 shadow-sm sm:p-6"
     >
       <div>
         <h2 className="font-display text-xl font-semibold">My Profile</h2>
@@ -152,17 +162,6 @@ export function ProfileEditor({
           Update your account details. Role cannot be changed here.
         </p>
       </div>
-
-      {error ? (
-        <p className="rounded-lg bg-[var(--hb-error-bg)] px-3 py-2 text-sm text-[var(--hb-error)]">
-          {error}
-        </p>
-      ) : null}
-      {msg ? (
-        <p className="rounded-lg bg-[var(--hb-mist)] px-3 py-2 text-sm text-[var(--hb-green)]">
-          {msg}
-        </p>
-      ) : null}
 
       <div className="flex flex-wrap items-center gap-4 rounded-lg border border-[rgba(26,92,58,0.1)] bg-white/50 p-4">
         <UserAvatar label={email || profile?.email} src={avatarUrl} size="lg" />

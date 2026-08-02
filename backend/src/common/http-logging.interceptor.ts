@@ -21,10 +21,12 @@ export class HttpLoggingInterceptor implements NestInterceptor {
     const res = http.getResponse<Response>();
     const started = Date.now();
     const requestId = req.headers['x-request-id'];
+    const isSse = /\/live\/stream(?:\?|$)/.test(req.originalUrl ?? '');
 
     return next.handle().pipe(
       tap({
         next: () => {
+          if (isSse) return;
           this.metrics.inc('httpRequests');
           if (res.statusCode >= 500) this.metrics.inc('http5xx');
           this.logger.log(

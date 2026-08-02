@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
-import { UtilityIcons, ICON_SIZES } from '@halal-basket/web';
+import { IconButton, UtilityIcons, ICON_SIZES } from '@halal-basket/web';
 import { BrandLogo } from '../brand/BrandLogo';
 import { useAuth } from '../../auth/AuthContext';
 import { ProfileMenu } from './ProfileMenu';
@@ -118,17 +118,15 @@ export function SiteHeader({
 
           {showMobileMenu && (
             <div className="md:hidden">
-              <button
-                type="button"
-                className="hb-icon-btn"
-                aria-label={open ? 'Close menu' : 'Open menu'}
+              <IconButton
+                label={open ? 'Close menu' : 'Open menu'}
                 aria-expanded={open}
                 onClick={() => setOpen((v) => !v)}
               >
                 {open
                   ? UtilityIcons.close({ size: ICON_SIZES.sm })
                   : UtilityIcons.menu({ size: ICON_SIZES.sm })}
-              </button>
+              </IconButton>
             </div>
           )}
         </div>

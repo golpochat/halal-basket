@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -6,7 +7,10 @@ import {
 import { FulfillmentStatus, OrderEventType } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { OrdersService } from '../orders/orders.service';
-import { DriverFeedbackDto } from './dto/driver.dto';
+import {
+  DriverFeedbackDto,
+  DriverUpdateStatusDto,
+} from './dto/driver.dto';
 import { RiskEngineService } from '../risk-engine/risk-engine.service';
 import { StockPredictionService } from '../stock-prediction/stock-prediction.service';
 
@@ -27,6 +31,14 @@ export class DriverService {
     return driver;
   }
 
+  private fulfillmentListInclude() {
+    return {
+      order: { include: { customer: true, items: true } },
+      shop: true,
+      items: { include: { product: true } },
+    } as const;
+  }
+
   async todaysOrders(userId: string, _role: string) {
     const driver = await this.getDriver(userId);
     const today = new Date();
@@ -38,7 +50,11 @@ export class DriverService {
       where: {
         driverId: driver.id,
         status: {
-          notIn: [FulfillmentStatus.delivered, FulfillmentStatus.cancelled],
+          notIn: [
+            FulfillmentStatus.delivered,
+            FulfillmentStatus.failed_attempt,
+            FulfillmentStatus.cancelled,
+          ],
         },
         OR: [
           { deliveryDate: { gte: day } },
@@ -48,25 +64,82 @@ export class DriverService {
           },
         ],
       },
-      include: {
-        order: { include: { customer: true, items: true } },
-        shop: true,
-        items: { include: { product: true } },
-      },
+      include: this.fulfillmentListInclude(),
       orderBy: [{ deliveryDate: 'asc' }, { id: 'asc' }],
     });
+  }
+
+  /** Past assigned jobs: delivered or cancelled (newest delivery date first). */
+  async orderHistory(userId: string, _role: string) {
+    const driver = await this.getDriver(userId);
+
+    return this.prisma.orderFulfillment.findMany({
+      where: {
+        driverId: driver.id,
+        status: {
+          in: [
+            FulfillmentStatus.delivered,
+            FulfillmentStatus.failed_attempt,
+            FulfillmentStatus.cancelled,
+          ],
+        },
+      },
+      include: this.fulfillmentListInclude(),
+      orderBy: [{ deliveryDate: 'desc' }, { id: 'desc' }],
+      take: 200,
+    });
+  }
+
+  async getAssignedOrder(
+    userId: string,
+    _role: string,
+    fulfillmentId: string,
+  ) {
+    const driver = await this.getDriver(userId);
+    const fulfillment = await this.prisma.orderFulfillment.findFirst({
+      where: { id: fulfillmentId, driverId: driver.id },
+      include: {
+        shop: true,
+        items: { include: { product: true } },
+        order: {
+          include: {
+            customer: {
+              include: {
+                // Phone only — email not needed for stop completion (minimize PII).
+                user: { select: { phone: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!fulfillment) {
+      throw new NotFoundException('Delivery not found');
+    }
+    return fulfillment;
   }
 
   async updateStatus(
     userId: string,
     _role: string,
     fulfillmentId: string,
-    status: FulfillmentStatus,
+    dto: DriverUpdateStatusDto,
   ) {
     const driver = await this.getDriver(userId);
     const fulfillment = await this.orders.assertOwnedFulfillment(fulfillmentId);
     if (fulfillment.driverId !== driver.id) {
       throw new ForbiddenException('Fulfillment not assigned to you');
+    }
+
+    const status = dto.status;
+    const reasons = (dto.reasons ?? [])
+      .map((r) => r.trim())
+      .filter(Boolean);
+
+    if (status === FulfillmentStatus.failed_attempt && reasons.length === 0) {
+      throw new BadRequestException(
+        'Select at least one reason for the failed attempt',
+      );
     }
 
     const updated = await this.prisma.orderFulfillment.update({
@@ -83,7 +156,12 @@ export class DriverService {
       actorUserId: userId,
       fulfillmentStatus: status,
       orderStatus,
+      note: dto.note?.trim() || undefined,
+      reasons:
+        status === FulfillmentStatus.failed_attempt ? reasons : undefined,
     });
+
+    await this.orders.notifyLive(fulfillment.orderId);
 
     return updated;
   }

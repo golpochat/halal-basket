@@ -47,6 +47,7 @@ enum FulfillmentStatus {
   ready
   out_for_delivery
   delivered
+  failed_attempt
   cancelled
 }
 

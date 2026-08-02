@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { toastError } from '@halal-basket/web';
 import { InfoPageShell } from '../../components/layout/InfoPageShell';
 import { api } from '../../lib/api';
 
@@ -18,14 +19,11 @@ function titleCaseDay(day: string) {
 
 export function DeliveryLocationsPage() {
   const [areas, setAreas] = useState<DeliveryConfig['areas'] | null>(null);
-  const [error, setError] = useState('');
 
   useEffect(() => {
     api<DeliveryConfig>('/platform/delivery-config')
       .then((cfg) => setAreas(cfg.areas))
-      .catch((e) =>
-        setError(e instanceof Error ? e.message : 'Failed to load areas'),
-      );
+      .catch((e) => toastError(e, 'Could not load delivery areas'));
   }, []);
 
   const rows = useMemo(() => {
@@ -43,13 +41,7 @@ export function DeliveryLocationsPage() {
       title="Delivery locations"
       subtitle="Pilot zones with scheduled delivery days."
     >
-      {error && (
-        <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
-          {error}
-        </p>
-      )}
-
-      {areas === null && !error && (
+      {areas === null && (
         <p className="text-sm text-[var(--hb-ink)]/55">Loading areas…</p>
       )}
 

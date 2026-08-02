@@ -6,6 +6,7 @@ import { BrandLogo } from '../components/brand/BrandLogo';
 
 const driverNav: DashboardNavItem[] = [
   { to: '/driver/dashboard', label: 'Dashboard', end: true, icon: 'truck' },
+  { to: '/driver/history', label: 'History', icon: 'list' },
 ];
 
 export function DriverLayout() {

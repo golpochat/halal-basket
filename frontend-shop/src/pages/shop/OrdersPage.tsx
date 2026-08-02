@@ -1,5 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ICON_SIZES, UtilityIcons } from '@halal-basket/web';
+import {
+  ICON_SIZES,
+  IconButton,
+  MenuSelect,
+  StatusBadge,
+  UtilityIcons,
+  formatFulfillmentMode,
+  formatFulfillmentStatus,
+  toastError,
+  toastSuccess,
+} from '@halal-basket/web';
 import { useAuth } from '../../auth/AuthContext';
 import { api } from '../../lib/api';
 
@@ -19,6 +29,7 @@ const STATUSES = [
   'ready',
   'out_for_delivery',
   'delivered',
+  'failed_attempt',
   'cancelled',
 ] as const;
 
@@ -32,8 +43,6 @@ export function ShopOrdersPage() {
   const [selectedDriver, setSelectedDriver] = useState<Record<string, string>>(
     {},
   );
-  const [error, setError] = useState('');
-  const [msg, setMsg] = useState('');
   const [page, setPage] = useState(1);
 
   async function refresh() {
@@ -46,7 +55,7 @@ export function ShopOrdersPage() {
   }
 
   useEffect(() => {
-    refresh().catch((e) => setError(e.message));
+    refresh().catch((e) => toastError(e, 'Could not load orders'));
   }, [token]);
 
   const totalPages = Math.max(1, Math.ceil(orders.length / PAGE_SIZE));
@@ -61,8 +70,6 @@ export function ShopOrdersPage() {
   }, [page, totalPages]);
 
   async function setStatus(id: string, status: string) {
-    setError('');
-    setMsg('');
     try {
       await api(`/shop-portal/orders/${id}/status`, {
         method: 'PATCH',
@@ -70,16 +77,16 @@ export function ShopOrdersPage() {
         body: JSON.stringify({ status }),
       });
       await refresh();
-      setMsg('Status updated');
+      toastSuccess('Status updated');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Update failed');
+      toastError(e, 'Could not update status');
     }
   }
 
   async function assign(id: string) {
     const driverId = selectedDriver[id] || drivers[0]?.id;
     if (!driverId) {
-      setError('No drivers available — ask super-admin to create one');
+      toastError('No drivers available - ask a super-admin to create one');
       return;
     }
     try {
@@ -89,9 +96,9 @@ export function ShopOrdersPage() {
         body: JSON.stringify({ driverId }),
       });
       await refresh();
-      setMsg('Driver assigned');
+      toastSuccess('Driver assigned');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Assign failed');
+      toastError(e, 'Could not assign driver');
     }
   }
 
@@ -101,27 +108,16 @@ export function ShopOrdersPage() {
         <p className="text-sm text-[var(--hb-ink)]/55">
           {orders.length} total · {PAGE_SIZE} per page
         </p>
-        <button
-          type="button"
-          className="hb-icon-btn"
-          aria-label="Refresh orders"
-          title="Refresh"
-          onClick={() => refresh().catch((e) => setError(e.message))}
+        <IconButton
+          label="Refresh orders"
+          tooltip="Refresh"
+          onClick={() =>
+            refresh().catch((e) => toastError(e, 'Could not refresh orders'))
+          }
         >
           {UtilityIcons.refresh({ size: ICON_SIZES.sm })}
-        </button>
+        </IconButton>
       </div>
-
-      {error && (
-        <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
-          {error}
-        </p>
-      )}
-      {msg && (
-        <p className="mb-3 rounded-lg bg-[var(--hb-mist)] px-3 py-2 text-sm text-[var(--hb-green)]">
-          {msg}
-        </p>
-      )}
 
       <div className="hb-data-table-wrap">
         <table className="hb-data-table">
@@ -141,14 +137,16 @@ export function ShopOrdersPage() {
                 <td className="font-semibold">
                   {f.order.customer?.name ?? 'Customer'}
                 </td>
-                <td>{f.status.replaceAll('_', ' ')}</td>
+                <td>
+                  <StatusBadge status={f.status} />
+                </td>
                 <td className="text-[var(--hb-ink)]/65">
-                  {f.order.fulfillmentMode.replaceAll('_', ' ')}
+                  {formatFulfillmentMode(f.order.fulfillmentMode)}
                 </td>
                 <td className="text-[var(--hb-ink)]/65">
                   {f.deliveryDate
                     ? new Date(f.deliveryDate).toLocaleDateString()
-                    : '—'}
+                    : '-'}
                 </td>
                 <td className="text-[var(--hb-ink)]/65">
                   {f.driver?.name ??
@@ -156,44 +154,40 @@ export function ShopOrdersPage() {
                 </td>
                 <td>
                   <div className="hb-data-table__actions">
-                    <select
-                      className="hb-input w-auto py-1.5 text-xs"
+                    <MenuSelect
+                      label={`Status for ${f.order.customer?.name ?? 'order'}`}
                       value={f.status}
-                      onChange={(e) => setStatus(f.id, e.target.value)}
-                      aria-label={`Status for ${f.order.customer?.name ?? 'order'}`}
-                    >
-                      {STATUSES.map((s) => (
-                        <option key={s} value={s}>
-                          {s.replaceAll('_', ' ')}
-                        </option>
-                      ))}
-                    </select>
-                    <select
-                      className="hb-input w-auto min-w-[7rem] py-1.5 text-xs"
+                      options={STATUSES.map((s) => ({
+                        value: s,
+                        label: formatFulfillmentStatus(s),
+                      }))}
+                      onChange={(value) => void setStatus(f.id, value)}
+                      triggerClassName="min-w-[7.5rem] text-xs shadow-none"
+                    />
+                    <MenuSelect
+                      label={`Driver for ${f.order.customer?.name ?? 'order'}`}
                       value={selectedDriver[f.id] ?? drivers[0]?.id ?? ''}
-                      onChange={(e) =>
+                      options={drivers.map((d) => ({
+                        value: d.id,
+                        label: d.name,
+                      }))}
+                      onChange={(value) =>
                         setSelectedDriver((m) => ({
                           ...m,
-                          [f.id]: e.target.value,
+                          [f.id]: value,
                         }))
                       }
-                      aria-label={`Driver for ${f.order.customer?.name ?? 'order'}`}
-                    >
-                      {drivers.map((d) => (
-                        <option key={d.id} value={d.id}>
-                          {d.name}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      className="hb-icon-btn hb-icon-btn--primary"
-                      aria-label={`Assign driver for ${f.order.customer?.name ?? 'order'}`}
-                      title="Assign driver"
+                      triggerClassName="min-w-[7.5rem] text-xs shadow-none"
+                      disabled={drivers.length === 0}
+                    />
+                    <IconButton
+                      label={`Assign driver for ${f.order.customer?.name ?? 'order'}`}
+                      tooltip="Assign driver"
+                      tone="primary"
                       onClick={() => assign(f.id)}
                     >
                       {UtilityIcons.locate({ size: ICON_SIZES.sm })}
-                    </button>
+                    </IconButton>
                   </div>
                 </td>
               </tr>
@@ -214,24 +208,20 @@ export function ShopOrdersPage() {
           Page {pageSafe} of {totalPages}
         </span>
         <div className="hb-pagination__controls">
-          <button
-            type="button"
-            className="hb-icon-btn"
-            aria-label="Previous page"
+          <IconButton
+            label="Previous page"
             disabled={pageSafe <= 1}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
           >
             {UtilityIcons.chevronLeft({ size: ICON_SIZES.sm })}
-          </button>
-          <button
-            type="button"
-            className="hb-icon-btn"
-            aria-label="Next page"
+          </IconButton>
+          <IconButton
+            label="Next page"
             disabled={pageSafe >= totalPages}
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
           >
             {UtilityIcons.chevronRight({ size: ICON_SIZES.sm })}
-          </button>
+          </IconButton>
         </div>
       </div>
     </div>

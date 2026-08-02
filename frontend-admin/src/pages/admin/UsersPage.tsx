@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react';
+import { SelectInput } from '@halal-basket/web';
 import { RequireAuth, RequireRole } from '../../auth/guards';
 import { useAuth } from '../../auth/AuthContext';
 import { api } from '../../lib/api';
@@ -93,29 +94,33 @@ function UsersInner() {
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
-            <select
-              className="hb-input"
+            <SelectInput
+              label="Role"
+              showLabel={false}
               value={role}
-              onChange={(e) =>
-                setRole(e.target.value as 'shop' | 'driver' | 'admin')
+              options={[
+                { value: 'driver', label: 'driver' },
+                { value: 'shop', label: 'shop' },
+                { value: 'admin', label: 'admin' },
+              ]}
+              onChange={(value) =>
+                setRole(value as 'shop' | 'driver' | 'admin')
               }
-            >
-              <option value="driver">driver</option>
-              <option value="shop">shop</option>
-              <option value="admin">admin</option>
-            </select>
+            />
             {role === 'shop' && (
-              <select
-                className="hb-input sm:col-span-2"
-                value={shopId}
-                onChange={(e) => setShopId(e.target.value)}
-              >
-                {shops.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
+              <div className="sm:col-span-2">
+                <SelectInput
+                  label="Shop"
+                  showLabel={false}
+                  value={shopId}
+                  options={shops.map((s) => ({
+                    value: s.id,
+                    label: s.name,
+                  }))}
+                  onChange={setShopId}
+                  placeholder="Select shop"
+                />
+              </div>
             )}
             <button className="hb-btn hb-btn-primary sm:col-span-2">
               Create user

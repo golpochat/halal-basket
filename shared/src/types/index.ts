@@ -27,6 +27,7 @@ export type FulfillmentStatus =
   | 'ready'
   | 'out_for_delivery'
   | 'delivered'
+  | 'failed_attempt'
   | 'cancelled';
 
 export type OrderEventType =
@@ -89,12 +90,31 @@ export interface CreateOrderItemDto {
   quantity: number;
 }
 
+export interface CustomerAddress {
+  id: string;
+  /** Predefined label: Home | Work | Family | Other */
+  label: string;
+  line1: string;
+  eircode: string;
+  /** Delivery location / area from admin delivery calendar */
+  area_name: string;
+  isDefault?: boolean;
+}
+
 export interface CreateOrderRequestDto {
   fulfillmentMode: FulfillmentMode;
   preferredShopId?: string;
   deliveryAreaName?: string;
   deliveryAddress?: Record<string, unknown>;
   items: CreateOrderItemDto[];
+}
+
+export interface OrderItemDto {
+  id: string;
+  productId: string;
+  quantity: number;
+  unitPrice: number;
+  product?: Pick<ProductDto, 'id' | 'name' | 'imageUrl'>;
 }
 
 export interface OrderFulfillmentDto {
@@ -123,7 +143,10 @@ export interface OrderDto {
   status: OrderStatus;
   totalAmount: number;
   deliveryAreaName: string | null;
+  deliveryAddress?: Record<string, unknown> | null;
   paymentStatus: PaymentStatus;
+  createdAt?: string;
+  items?: OrderItemDto[];
   fulfillments?: OrderFulfillmentDto[];
   events?: OrderEventDto[];
 }

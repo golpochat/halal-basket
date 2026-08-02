@@ -17,6 +17,10 @@ import { PlatformLocaleService } from '../platform-locale/platform-locale.servic
 import { StockService } from '../stock/stock.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { MetricsService } from '../../common/metrics.service';
+import {
+  OrderLiveHub,
+  type OrderLiveSnapshot,
+} from './order-live.hub';
 
 @Injectable()
 export class OrdersService {
@@ -26,6 +30,7 @@ export class OrdersService {
     private readonly platform: PlatformLocaleService,
     private readonly stock: StockService,
     private readonly metrics: MetricsService,
+    private readonly liveHub: OrderLiveHub,
   ) {}
 
   async create(userId: string, dto: CreateOrderDto) {
@@ -247,16 +252,61 @@ export class OrdersService {
     throw new ForbiddenException();
   }
 
-  /** Lightweight poll payload for live status. */
-  async getStatusSnapshot(orderId: string, userId: string, role: string) {
-    const order = await this.getByIdForUser(orderId, userId, role);
+  /** Customer, assigned driver, linked shop, or admin may watch live status. */
+  async assertCanWatchLive(orderId: string, userId: string, role: string) {
+    if (role === UserRole.admin || role === UserRole.super_admin) {
+      await this.getByIdInternal(this.prisma, orderId);
+      return;
+    }
+
+    if (role === UserRole.customer) {
+      await this.getByIdForUser(orderId, userId, role);
+      return;
+    }
+
+    if (role === UserRole.driver) {
+      const driver = await this.prisma.driver.findUnique({ where: { userId } });
+      if (!driver) throw new ForbiddenException();
+      const assigned = await this.prisma.orderFulfillment.findFirst({
+        where: { orderId, driverId: driver.id },
+        select: { id: true },
+      });
+      if (!assigned) throw new ForbiddenException();
+      return;
+    }
+
+    if (role === UserRole.shop) {
+      const links = await this.prisma.shopUser.findMany({ where: { userId } });
+      const shopIds = links.map((l) => l.shopId);
+      if (shopIds.length === 0) throw new ForbiddenException();
+      const owned = await this.prisma.orderFulfillment.findFirst({
+        where: { orderId, shopId: { in: shopIds } },
+        select: { id: true },
+      });
+      if (!owned) throw new ForbiddenException();
+      return;
+    }
+
+    throw new ForbiddenException();
+  }
+
+  buildStatusSnapshot(
+    order: Awaited<ReturnType<OrdersService['getByIdInternal']>>,
+  ): OrderLiveSnapshot {
+    const fulfillmentCount = order.fulfillments.length;
     return {
       id: order.id,
       status: order.status,
+      paymentStatus: order.paymentStatus,
       fulfillmentMode: order.fulfillmentMode,
       updatedAt: order.updatedAt,
-      fulfillments: order.fulfillments.map((f) => ({
+      polledAt: new Date().toISOString(),
+      fulfillmentCount,
+      splitOrder: fulfillmentCount > 1,
+      fulfillments: order.fulfillments.map((f, index) => ({
         id: f.id,
+        part: index + 1,
+        partsTotal: fulfillmentCount,
         shopId: f.shopId,
         shopName: f.shop?.name,
         shopAddress: f.shop?.address ?? null,
@@ -265,6 +315,23 @@ export class OrdersService {
         estimatedDeliveryAt: f.estimatedDeliveryAt,
       })),
     };
+  }
+
+  /** Lightweight poll / stream payload for live status. */
+  async getStatusSnapshot(
+    orderId: string,
+    userId: string,
+    role: string,
+  ): Promise<OrderLiveSnapshot> {
+    await this.assertCanWatchLive(orderId, userId, role);
+    const order = await this.getByIdInternal(this.prisma, orderId);
+    return this.buildStatusSnapshot(order);
+  }
+
+  /** Push latest snapshot to all open live streams for this order. */
+  async notifyLive(orderId: string) {
+    const order = await this.getByIdInternal(this.prisma, orderId);
+    this.liveHub.publish(orderId, this.buildStatusSnapshot(order));
   }
 
   async listMine(userId: string) {
@@ -276,8 +343,8 @@ export class OrdersService {
     return this.prisma.order.findMany({
       where: { customerId: customer.id },
       include: {
-        fulfillments: true,
-        items: true,
+        fulfillments: { include: { shop: true } },
+        items: { include: { product: true } },
         events: { orderBy: { createdAt: 'asc' } },
       },
       orderBy: { createdAt: 'desc' },
@@ -291,6 +358,7 @@ export class OrdersService {
     fulfillmentStatus: FulfillmentStatus;
     orderStatus?: OrderStatus;
     note?: string;
+    reasons?: string[];
   }) {
     await this.prisma.orderEvent.create({
       data: {
@@ -302,6 +370,7 @@ export class OrdersService {
           fulfillmentStatus: input.fulfillmentStatus,
           orderStatus: input.orderStatus,
           note: input.note,
+          reasons: input.reasons,
         },
       },
     });
@@ -359,9 +428,11 @@ export class OrdersService {
           s === FulfillmentStatus.preparing ||
           s === FulfillmentStatus.ready ||
           s === FulfillmentStatus.out_for_delivery ||
-          s === FulfillmentStatus.delivered,
+          s === FulfillmentStatus.delivered ||
+          s === FulfillmentStatus.failed_attempt,
       )
     ) {
+      // failed_attempt keeps the order in progress until reschedule or cancel.
       next = OrderStatus.in_progress;
     } else {
       next = OrderStatus.confirmed;
@@ -382,6 +453,7 @@ export class OrdersService {
       case FulfillmentStatus.preparing:
       case FulfillmentStatus.ready:
       case FulfillmentStatus.out_for_delivery:
+      case FulfillmentStatus.failed_attempt:
         return OrderStatus.in_progress;
       case FulfillmentStatus.delivered:
         return OrderStatus.completed;

@@ -9,7 +9,6 @@ import {
 const DELIVERY_OPTIONS = [
   { value: 'any', label: 'Any' },
   { value: 'scheduled', label: 'Scheduled delivery' },
-  { value: 'realtime', label: 'Real-time delivery' },
   { value: 'pickup', label: 'Pickup' },
 ] as const;
 
@@ -95,8 +94,8 @@ export function FiltersPanel() {
           fullWidth
         />
         <p className="text-xs text-[var(--hb-ink)]/50">
-          Delivery type filters the catalogue experience; checkout still
-          confirms the final mode for your order.
+          Preference only — choose pickup, scheduled, or realtime (when
+          enabled) at checkout. Realtime availability is confirmed there.
         </p>
       </div>
     </Modal>

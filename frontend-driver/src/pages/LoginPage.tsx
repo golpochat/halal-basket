@@ -1,6 +1,12 @@
 import { FormEvent, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Button, TextInput, ToastViewport } from '@halal-basket/web';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import {
+  Button,
+  TextInput,
+  ToastViewport,
+  formatUserFacingError,
+  toastError,
+} from '@halal-basket/web';
 import { PasswordInput } from '../components/ui/PasswordInput';
 import { BrandLogo } from '../components/brand/BrandLogo';
 import { useAuth } from '../auth/AuthContext';
@@ -34,14 +40,18 @@ function LoginForm() {
         body: JSON.stringify({ email, password }),
       });
       if (result.user.role !== 'driver') {
-        setError('This app is for driver accounts only.');
+        const msg = 'This app is for driver accounts only.';
+        setError(msg);
+        toastError(msg);
         return;
       }
       setSession(result);
       const next = params.get('next');
       navigate(next?.startsWith('/') ? next : homeForRole(result.user.role));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Sign-in failed');
+      const msg = formatUserFacingError(err, 'Could not sign in');
+      setError(msg);
+      toastError(msg);
     } finally {
       setLoading(false);
     }
@@ -89,9 +99,6 @@ function LoginForm() {
           <Button type="submit" variant="primary" className="w-full py-3" disabled={loading}>
             {loading ? 'Signing in…' : 'Sign in'}
           </Button>
-          <p className="text-center text-sm text-[var(--hb-ink)]/55">
-            <Link to="/">← Back</Link>
-          </p>
         </form>
       </main>
       <ToastViewport />

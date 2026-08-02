@@ -18,6 +18,7 @@ import { TermsPage } from './pages/customer/TermsPage';
 import { RedirectToAdminApp } from './pages/RedirectToAdminApp';
 import { RedirectDashboardOrder } from './pages/RedirectDashboardOrder';
 import { CustomerProfilePage } from './pages/customer/ProfilePage';
+import { CustomerAddressesPage } from './pages/customer/AddressesPage';
 
 export default function App() {
   return (
@@ -66,6 +67,7 @@ export default function App() {
               <Route path="orders" element={<CustomerOrdersPage />} />
               <Route path="orders/:id" element={<CustomerOrdersPage />} />
               <Route path="profile" element={<CustomerProfilePage />} />
+              <Route path="addresses" element={<CustomerAddressesPage />} />
             </Route>
 
             <Route
