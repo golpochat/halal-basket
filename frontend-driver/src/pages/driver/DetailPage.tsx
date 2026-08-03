@@ -76,7 +76,10 @@ const STATUS_OPTIONS = [
     label: formatFulfillmentStatus('out_for_delivery'),
   },
   { value: 'delivered', label: formatFulfillmentStatus('delivered') },
-  { value: 'failed_attempt', label: "Couldn't deliver" },
+  {
+    value: 'failed_attempt',
+    label: formatFulfillmentStatus('failed_attempt'),
+  },
   { value: 'cancelled', label: formatFulfillmentStatus('cancelled') },
 ];
 
@@ -685,7 +688,7 @@ export function DriverDetailPage() {
 
       <Modal
         open={failOpen}
-        title="Couldn't deliver"
+        title={formatFulfillmentStatus('failed_attempt')}
         onClose={() => !busy && setFailOpen(false)}
         footer={
           <div className="flex flex-wrap gap-2">
@@ -708,7 +711,7 @@ export function DriverDetailPage() {
       >
         <div className="space-y-3">
           <p className="text-sm text-[var(--hb-ink)]/65">
-            Why couldn&apos;t you deliver?{' '}
+            Why did the delivery attempt fail?{' '}
             <span className="text-[var(--hb-ink)]/45">(required)</span>
           </p>
           <MenuMultiSelect

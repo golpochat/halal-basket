@@ -5,12 +5,14 @@ import { AdminCustomersService } from './admin-customers.service';
 import { AdminOrderEventsService } from './admin-order-events.service';
 import { AdminAnalyticsService } from './admin-analytics.service';
 import { GdprService } from './gdpr.service';
+import { AdminEntityOverviewService } from './admin-entity-overview.service';
 import { ProductsModule } from '../products/products.module';
 import { ShopsModule } from '../shops/shops.module';
 import { RiskEngineModule } from '../risk-engine/risk-engine.module';
+import { RbacModule } from '../rbac/rbac.module';
 
 @Module({
-  imports: [ProductsModule, ShopsModule, RiskEngineModule],
+  imports: [ProductsModule, ShopsModule, RiskEngineModule, RbacModule],
   controllers: [AdminController],
   providers: [
     AdminUsersService,
@@ -18,6 +20,7 @@ import { RiskEngineModule } from '../risk-engine/risk-engine.module';
     AdminOrderEventsService,
     AdminAnalyticsService,
     GdprService,
+    AdminEntityOverviewService,
   ],
 })
 export class AdminModule {}

@@ -59,7 +59,11 @@ export function useBrandingQuery(api: Api) {
   return useQuery({
     queryKey: ['platform', 'branding'] as const,
     queryFn: () =>
-      api<{ heroBackgroundUrl: string | null }>('/platform/branding'),
+      api<{
+        heroBackgroundUrl: string | null;
+        heroTitle: string;
+        heroSubtitle: string;
+      }>('/platform/branding'),
   });
 }
 

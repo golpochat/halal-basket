@@ -40,6 +40,12 @@ export function ProfileMenu() {
         to: '/customer/orders',
         icon: 'package',
       },
+      {
+        key: 'favourites',
+        label: 'Favourites',
+        to: '/customer/favourites',
+        icon: 'heart',
+      },
     );
   } else {
     const dest = homeForRole(role);

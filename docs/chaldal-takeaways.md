@@ -1,8 +1,8 @@
 # Chaldal Takeaways for Halal Basket
 
 Reference site: [https://chaldal.com/](https://chaldal.com/)  
-Competitive canvas: `canvases/chaldal-competitive-analysis.canvas.tsx`  
-Last reviewed: July 2026
+Last reviewed: August 2026  
+Post-MVP status: see [`SYSTEM-COMPLETE.md`](../SYSTEM-COMPLETE.md) § What’s next.
 
 **Rule:** Steal UX and trust patterns. Do **not** copy dark-store, 1-hour delivery, multi-vertical sprawl, or non-grocery mega-mart catalogue.
 
@@ -87,19 +87,17 @@ Do **not** build these in Phases A–C. Revisit after pilot has repeat order cad
 - **When:** After Phase C pilot proves weekly/repeat baskets; optional Phase E+ growth.
 - **Depends on:** Order history, customer accounts, clear margin to fund rewards.
 
-### F2. Coupons & offers centre
+### F2. Coupons & offers centre — **done (core)**
 
 - **Chaldal:** Coupons, Offers, Deal of the Day, Flash Sales.
-- **HB version:** Admin-issued promo codes; limited “deal” SKUs from shops; first-order discount.
-- **When:** Phase E+ or when shops request promo tooling.
-- **Depends on:** Pricing rules, shop consent for discounted `shop_products`, fraud limits.
+- **HB version:** Admin **Promotions** (banner + coupon table/modal); validate on checkout (`startsAt` / `endsAt` / max limits). Sample codes `HALAL10`, `WELCOME5`.
+- **Still open:** Deal-of-the-day SKUs / flash sales if shops want them later.
 
-### F3. Favourites / reorder
+### F3. Favourites / reorder — **done**
 
 - **Chaldal:** Favourites in nav.
-- **HB version:** Saved products + “order again” from past baskets.
-- **When:** Soon after MVP if UX capacity allows; otherwise early Phase D/E.
-- **Depends on:** Customer auth + order history (MVP has both primitives).
+- **HB version:** Heart toggle on catalogue cards; account **Favourites** page; reorder from past baskets.
+- **Depends on:** Customer auth + Product Bank id (not shop-product id).
 
 ### F4. Live chat / premium assisted ordering
 
@@ -177,10 +175,13 @@ Use on customer home / landing — refine with brand voice later:
 **Future**
 
 - [ ] Loyalty / points  
-- [ ] Coupons & deals centre  
-- [ ] Favourites / reorder  
+- [x] Coupons & deals centre (admin promo codes + checkout validation; flash/deal SKUs optional later)  
+- [x] Reorder from past baskets  
+- [x] Favourites / wishlist  
 - [ ] Live chat / premium care  
 - [ ] App / first-order incentive  
 - [ ] Optional pay-on-delivery  
 - [ ] Corporate accounts  
 - [ ] Certifier / brand trust strip  
+- [x] Cookie consent banner (before analytics)  
+

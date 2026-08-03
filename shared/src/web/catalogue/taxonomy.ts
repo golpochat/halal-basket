@@ -3,7 +3,6 @@ export type CategoryNode = {
   name: string;
   /** Product Bank category names that belong under this node */
   matchNames?: string[];
-  popular?: boolean;
   children?: CategoryNode[];
 };
 
@@ -12,7 +11,6 @@ export const CATEGORY_TREE: CategoryNode[] = [
   {
     id: 'meat-poultry',
     name: 'Meat & Poultry',
-    popular: true,
     matchNames: ['Meat & Poultry'],
     children: [
       {
@@ -20,8 +18,16 @@ export const CATEGORY_TREE: CategoryNode[] = [
         name: 'Chicken',
         matchNames: ['Meat & Poultry'],
         children: [
-          { id: 'chicken-fresh', name: 'Fresh cuts', matchNames: ['Meat & Poultry'] },
-          { id: 'chicken-frozen', name: 'Frozen', matchNames: ['Meat & Poultry'] },
+          {
+            id: 'chicken-fresh',
+            name: 'Fresh cuts',
+            matchNames: ['Meat & Poultry'],
+          },
+          {
+            id: 'chicken-frozen',
+            name: 'Frozen',
+            matchNames: ['Meat & Poultry'],
+          },
         ],
       },
       {
@@ -38,7 +44,6 @@ export const CATEGORY_TREE: CategoryNode[] = [
   {
     id: 'fruits-veg',
     name: 'Fruits & Vegetables',
-    popular: true,
     matchNames: ['Produce', 'Fruits & Vegetables'],
     children: [
       {
@@ -46,7 +51,11 @@ export const CATEGORY_TREE: CategoryNode[] = [
         name: 'Fruits',
         matchNames: ['Produce', 'Fruits & Vegetables'],
         children: [
-          { id: 'fruits-fresh', name: 'Fresh fruit', matchNames: ['Produce'] },
+          {
+            id: 'fruits-fresh',
+            name: 'Fresh fruit',
+            matchNames: ['Produce'],
+          },
         ],
       },
       {
@@ -54,7 +63,11 @@ export const CATEGORY_TREE: CategoryNode[] = [
         name: 'Vegetables',
         matchNames: ['Produce', 'Fruits & Vegetables'],
         children: [
-          { id: 'veg-leafy', name: 'Leafy greens', matchNames: ['Produce'] },
+          {
+            id: 'veg-leafy',
+            name: 'Leafy greens',
+            matchNames: ['Produce'],
+          },
         ],
       },
     ],
@@ -62,7 +75,6 @@ export const CATEGORY_TREE: CategoryNode[] = [
   {
     id: 'cooking',
     name: 'Cooking Essentials',
-    popular: true,
     matchNames: ['Pantry', 'Cooking Essentials'],
     children: [
       {
@@ -88,16 +100,13 @@ export const CATEGORY_TREE: CategoryNode[] = [
   {
     id: 'beverages',
     name: 'Beverages',
-    popular: true,
     matchNames: ['Beverages', 'Drinks'],
     children: [
       {
         id: 'tea-coffee',
         name: 'Tea & Coffee',
         matchNames: ['Beverages'],
-        children: [
-          { id: 'tea', name: 'Tea', matchNames: ['Beverages'] },
-        ],
+        children: [{ id: 'tea', name: 'Tea', matchNames: ['Beverages'] }],
       },
       {
         id: 'soft-drinks',
@@ -109,7 +118,6 @@ export const CATEGORY_TREE: CategoryNode[] = [
   {
     id: 'home-cleaning',
     name: 'Home & Cleaning',
-    popular: true,
     matchNames: ['Household', 'Home & Cleaning'],
     children: [
       {
@@ -125,7 +133,6 @@ export const CATEGORY_TREE: CategoryNode[] = [
   {
     id: 'dairy',
     name: 'Dairy & Eggs',
-    popular: true,
     matchNames: ['Dairy', 'Dairy & Eggs'],
     children: [
       { id: 'milk', name: 'Milk', matchNames: ['Dairy'] },
@@ -133,6 +140,8 @@ export const CATEGORY_TREE: CategoryNode[] = [
     ],
   },
 ];
+
+const ROOT_IDS = new Set(CATEGORY_TREE.map((n) => n.id));
 
 export function findCategoryNode(
   id: string,
@@ -175,22 +184,71 @@ export function collectMatchNames(node: CategoryNode): string[] {
   return Array.from(set);
 }
 
-export function popularCategories(
+function parentIdOf(
+  id: string,
   nodes: CategoryNode[] = CATEGORY_TREE,
-): CategoryNode[] {
-  return nodes.filter((n) => n.popular);
+  parent: string | null = null,
+): string | null | undefined {
+  for (const n of nodes) {
+    if (n.id === id) return parent;
+    if (n.children) {
+      const found = parentIdOf(id, n.children, n.id);
+      if (found !== undefined) return found;
+    }
+  }
+  return undefined;
 }
 
-/** Resolve featured list for UI: API wins; fall back to static popular flags. */
+function collectLeaves(
+  nodes: CategoryNode[] = CATEGORY_TREE,
+  out: CategoryNode[] = [],
+): CategoryNode[] {
+  for (const n of nodes) {
+    if (!n.children?.length) out.push(n);
+    else collectLeaves(n.children, out);
+  }
+  return out;
+}
+
+/** Chip shown for a leaf: mid-level parent, or the leaf when under a root. */
+export function popularDisplayId(leafId: string): string {
+  const parent = parentIdOf(leafId) ?? null;
+  if (parent && !ROOT_IDS.has(parent)) return parent;
+  return leafId;
+}
+
+/**
+ * Client fallback when the API has no/insufficient data:
+ * mid-level browse chips (not root categories).
+ */
+export function popularCategories(max = 8): CategoryNode[] {
+  const seen = new Set<string>();
+  const out: CategoryNode[] = [];
+  for (const leaf of collectLeaves()) {
+    const id = popularDisplayId(leaf.id);
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const node = findCategoryNode(id);
+    if (!node) continue;
+    out.push(node);
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
+/** Resolve featured list for UI: API wins; fall back to static mid-level chips. */
 export function resolveFeaturedCategories(
   fromApi: Array<{ id: string; name: string }> | undefined | null,
 ): CategoryNode[] {
   if (fromApi && fromApi.length > 0) {
     return fromApi
-      .map((item) => findCategoryNode(item.id) ?? {
-        id: item.id,
-        name: item.name,
-      })
+      .map(
+        (item) =>
+          findCategoryNode(item.id) ?? {
+            id: item.id,
+            name: item.name,
+          },
+      )
       .filter((n): n is CategoryNode => Boolean(n?.id && n?.name));
   }
   return popularCategories();

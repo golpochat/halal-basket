@@ -2,13 +2,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toastError } from '@halal-basket/web';
 import { InfoPageShell } from '../../components/layout/InfoPageShell';
+import { useLocale } from '../../locale/LocaleContext';
 import { api } from '../../lib/api';
-import {
-  formatEuroFee,
-  type DeliveryFeeConfig,
-} from '../../lib/delivery-fee';
+import { type DeliveryFeeConfig } from '../../lib/delivery-fee';
 
 export function DeliveryChargesPage() {
+  const { formatMoney } = useLocale();
   const [config, setConfig] = useState<DeliveryFeeConfig | null>(null);
 
   useEffect(() => {
@@ -45,7 +44,7 @@ export function DeliveryChargesPage() {
                 Default scheduled delivery
               </p>
               <p className="mt-3 font-display text-4xl font-semibold tracking-tight text-[var(--hb-green)]">
-                {formatEuroFee(config.scheduledDeliveryFee)}
+                {formatMoney(config.scheduledDeliveryFee)}
               </p>
               <p className="mt-3 text-sm leading-relaxed text-[var(--hb-ink)]/65">
                 Used when an area has no custom fee. Your checkout total uses
@@ -57,7 +56,7 @@ export function DeliveryChargesPage() {
                 Pickup
               </p>
               <p className="mt-3 font-display text-4xl font-semibold tracking-tight text-[var(--hb-green)]">
-                {formatEuroFee(config.pickupFee)}
+                {formatMoney(config.pickupFee)}
               </p>
               <p className="mt-3 text-sm leading-relaxed text-[var(--hb-ink)]/65">
                 Collect from your Halal Basket pickup location when the order is
@@ -69,7 +68,7 @@ export function DeliveryChargesPage() {
           {freeOver > 0 && (
             <p className="mt-6 rounded-[var(--hb-radius-lg)] border border-[rgba(26,92,58,0.12)] bg-white/80 px-5 py-4 text-sm text-[var(--hb-ink)]/75">
               Free scheduled delivery on orders of{' '}
-              <strong>€{freeOver.toFixed(2)}</strong> or more (items subtotal).
+              <strong>{formatMoney(freeOver)}</strong> or more (items subtotal).
             </p>
           )}
 
@@ -101,7 +100,7 @@ export function DeliveryChargesPage() {
                         {row.name}
                       </td>
                       <td className="px-4 py-3 sm:px-5">
-                        {formatEuroFee(row.fee)}
+                        {formatMoney(row.fee)}
                       </td>
                     </tr>
                   ))}

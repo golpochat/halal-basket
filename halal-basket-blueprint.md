@@ -566,7 +566,7 @@ Trust badges, delivery calendar preview, real-time stock when available, toasts,
 - Order status
 - Help / FAQ
 - Sign-in / register
-- **Temporary:** `/admin`, `/super-admin` (role-gated) until a dedicated admin app exists
+- **Admin (ops + platform):** `frontend-admin/` — Vite + React + TypeScript + Tailwind. Dev server port **5176**. Role- and permission-gated (`/admin`, `/super-admin`). Customer app does **not** host staff dashboards.
 
 Defer realtime delivery UI and multi-shop split UX to Phase 2.
 

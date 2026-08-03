@@ -367,6 +367,8 @@ A Foundation
             → G Scale (as needed)
 ```
 
+**Status:** A–F are implemented. For live open gaps and the ordered post-roadmap backlog (cookie banner → Stripe/Staging → …), see [`SYSTEM-COMPLETE.md`](./SYSTEM-COMPLETE.md).
+
 Parallelization (safe):
 - Frontends shells in A while backend catalogue proceeds  
 - Stripe account setup / legal during C  

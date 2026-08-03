@@ -1,14 +1,38 @@
 export type Shop = { id: string; name: string };
 
 export type Analytics = {
-  orders: { total: number; completed: number; successRate: number };
+  orders: {
+    total: number;
+    completed: number;
+    cancelled: number;
+    successRate: number;
+  };
   payments: { paidOrders: number; revenue: number; refunds: number };
-  fulfillments: { deliveryRate: number };
+  fulfillments: {
+    deliveryRate: number;
+    byStatus: Record<string, number>;
+  };
   trust: {
     complaints: number;
     blockedCustomers: number;
     missingItemReports: number;
   };
+  generatedAt?: string;
+};
+
+export type FeaturedAdminItem = {
+  id: string;
+  categoryId: string;
+  name: string;
+  sortOrder: number;
+  isActive: boolean;
+};
+
+export type FeaturedAdminResponse = {
+  items: FeaturedAdminItem[];
+  available: Array<{ id: string; name: string }>;
+  minVisible: number;
+  maxVisible: number;
 };
 
 export type CurrencyRow = {
@@ -33,21 +57,6 @@ export type LanguageRow = {
   sortOrder: number;
 };
 
-export type FeaturedAdminItem = {
-  id: string;
-  categoryId: string;
-  name: string;
-  sortOrder: number;
-  isActive: boolean;
-};
-
-export type FeaturedAdminResponse = {
-  items: FeaturedAdminItem[];
-  available: Array<{ id: string; name: string }>;
-  minVisible: number;
-  maxVisible: number;
-};
-
 export type DeliveryFees = {
   scheduledDeliveryFee: number;
   pickupFee: number;
@@ -62,6 +71,18 @@ export type CalendarAdminRow = {
   isActive: boolean;
 };
 
+export type WarehouseRow = {
+  id: string;
+  name: string;
+  address: string | null;
+  lat: number | null;
+  lng: number | null;
+  isActive: boolean;
+  deliveryZones: unknown;
+  published: boolean;
+};
+
+/** @deprecated Prefer WarehouseRow[] from /admin/platform/warehouses */
 export type WarehouseAdmin = {
   published: boolean;
   warehouse: {

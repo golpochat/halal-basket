@@ -12,9 +12,18 @@ export type AuthUser = {
   avatarUrl?: string | null;
 };
 
+export type StaffRoleSummary = {
+  id: string;
+  name: string;
+  slug: string;
+};
+
 export type AuthSession = {
   accessToken: string;
   user: AuthUser;
+  /** Staff RBAC permission keys (admin / super_admin). */
+  permissions?: string[];
+  staffRole?: StaffRoleSummary | null;
 };
 
 export type Shop = {

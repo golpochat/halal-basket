@@ -37,6 +37,22 @@ export function RequireRole({
   return children;
 }
 
+/** Super admin always passes. Admin needs every listed permission key. */
+export function RequirePermission({
+  permissions,
+  children,
+}: {
+  permissions: string[];
+  children: React.ReactNode;
+}) {
+  const session = useAuthStore((s) => s.session);
+  if (!session) return <Navigate to="/login" replace />;
+  if (session.user.role === 'super_admin') return children;
+  const have = new Set(session.permissions ?? []);
+  if (permissions.every((p) => have.has(p))) return children;
+  return redirectHome(session.user.role);
+}
+
 export function GuestOnly({ children }: { children: React.ReactNode }) {
   const session = useAuthStore((s) => s.session);
   if (session) {

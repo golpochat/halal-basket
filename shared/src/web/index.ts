@@ -19,6 +19,7 @@ export * from './ui/Input';
 export * from './ui/Badge';
 export * from './ui/StatusBadge';
 export * from './fulfillment-labels';
+export * from './markdown';
 export * from './driver-feedback-tags';
 export * from './delivery-attempt-reasons';
 export * from './ui/Modal';

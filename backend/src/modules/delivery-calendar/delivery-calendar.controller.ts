@@ -14,6 +14,8 @@ import { UserRole } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { RequirePermissions } from '../../common/decorators/permissions.decorator';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { DeliveryCalendarService } from './delivery-calendar.service';
 import {
   CreateCalendarEntryDto,
@@ -21,7 +23,7 @@ import {
   UpdateCalendarEntryDto,
 } from './dto/delivery-calendar.dto';
 
-const PLATFORM = [UserRole.super_admin] as const;
+const OPS = [UserRole.admin, UserRole.super_admin] as const;
 
 @Controller()
 export class DeliveryCalendarController {
@@ -38,22 +40,25 @@ export class DeliveryCalendarController {
   }
 
   @Get('admin/delivery-calendar')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(...PLATFORM)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @Roles(...OPS)
+  @RequirePermissions('locations.read')
   listAdmin() {
     return this.calendar.listAdmin();
   }
 
   @Post('admin/delivery-calendar')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(...PLATFORM)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @Roles(...OPS)
+  @RequirePermissions('locations.write')
   create(@Body() dto: CreateCalendarEntryDto) {
     return this.calendar.create(dto);
   }
 
   @Patch('admin/delivery-calendar/:id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(...PLATFORM)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @Roles(...OPS)
+  @RequirePermissions('locations.write')
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateCalendarEntryDto,
@@ -62,8 +67,9 @@ export class DeliveryCalendarController {
   }
 
   @Patch('admin/delivery-calendar/:id/active')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(...PLATFORM)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @Roles(...OPS)
+  @RequirePermissions('locations.write')
   setActive(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: SetCalendarActiveDto,
@@ -72,8 +78,9 @@ export class DeliveryCalendarController {
   }
 
   @Delete('admin/delivery-calendar/:id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(...PLATFORM)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @Roles(...OPS)
+  @RequirePermissions('locations.write')
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.calendar.remove(id);
   }

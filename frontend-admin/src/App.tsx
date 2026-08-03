@@ -14,16 +14,22 @@ import { AdminBrandingPage } from './pages/admin/BrandingPage';
 import { AdminWarehousePage } from './pages/admin/WarehousePage';
 import { AdminDeliveryFeesPage } from './pages/admin/DeliveryFeesPage';
 import { AdminPromotionsPage } from './pages/admin/PromotionsPage';
-import { AdminDeliveryCalendarPage } from './pages/admin/DeliveryCalendarPage';
-import { AdminFeaturedCategoriesPage } from './pages/admin/FeaturedCategoriesPage';
 import { AdminCurrenciesPage } from './pages/admin/CurrenciesPage';
 import { AdminLanguagesPage } from './pages/admin/LanguagesPage';
 import { AdminShopsPage } from './pages/admin/ShopsPage';
+import { AdminShopOverviewPage } from './pages/admin/ShopOverviewPage';
 import { AdminUsersPage } from './pages/admin/UsersPage';
+import { AdminShopUsersPage } from './pages/admin/ShopUsersPage';
+import { AdminDriversPage } from './pages/admin/DriversPage';
+import { AdminDriverActivityPage } from './pages/admin/DriverActivityPage';
+import { AdminDriverOverviewPage } from './pages/admin/DriverOverviewPage';
+import { AdminRolesPage } from './pages/admin/RolesPage';
 import { AdminCataloguePage } from './pages/admin/CataloguePage';
 import { AdminGdprPage } from './pages/admin/GdprPage';
 import { AdminOpsDrillPage } from './pages/admin/OpsDrillPage';
 import { AdminProfilePage } from './pages/admin/ProfilePage';
+import { AdminFeaturedCategoriesPage } from './pages/admin/FeaturedCategoriesPage';
+import { AdminLegalPagesPage } from './pages/admin/LegalPagesPage';
 import { useAuth } from './auth/AuthContext';
 import { homeForRole } from './lib/api';
 
@@ -31,6 +37,18 @@ function RoleHomeRedirect() {
   const { session } = useAuth();
   if (!session) return <Navigate to="/login" replace />;
   return <Navigate to={homeForRole(session.user.role)} replace />;
+}
+
+function LegacyOpsRedirect() {
+  const { session } = useAuth();
+  if (!session) return <Navigate to="/login" replace />;
+  if (session.user.role === 'super_admin') {
+    return <Navigate to="/super-admin/ops" replace />;
+  }
+  if (session.user.role === 'admin') {
+    return <Navigate to="/admin/ops" replace />;
+  }
+  return <RoleHomeRedirect />;
 }
 
 function adminChildRoutes() {
@@ -45,12 +63,21 @@ function adminChildRoutes() {
       <Route path="warehouse" element={<AdminWarehousePage />} />
       <Route path="delivery-fees" element={<AdminDeliveryFeesPage />} />
       <Route path="promotions" element={<AdminPromotionsPage />} />
-      <Route path="delivery-calendar" element={<AdminDeliveryCalendarPage />} />
       <Route path="featured" element={<AdminFeaturedCategoriesPage />} />
+      <Route path="legal" element={<AdminLegalPagesPage />} />
       <Route path="currencies" element={<AdminCurrenciesPage />} />
       <Route path="languages" element={<AdminLanguagesPage />} />
       <Route path="shops" element={<AdminShopsPage />} />
+      <Route path="shops/:shopId" element={<AdminShopOverviewPage />} />
+      <Route path="roles" element={<AdminRolesPage />} />
       <Route path="users" element={<AdminUsersPage />} />
+      <Route path="shop-users" element={<AdminShopUsersPage />} />
+      <Route path="drivers" element={<AdminDriversPage />} />
+      <Route path="driver-activity" element={<AdminDriverActivityPage />} />
+      <Route
+        path="driver-activity/:driverId"
+        element={<AdminDriverOverviewPage />}
+      />
       <Route path="catalogue" element={<AdminCataloguePage />} />
       <Route path="gdpr" element={<AdminGdprPage />} />
       <Route path="ops-drill" element={<AdminOpsDrillPage />} />
@@ -78,7 +105,7 @@ export default function App() {
             {/* Legacy */}
             <Route path="/dashboard" element={<RoleHomeRedirect />} />
             <Route path="/dashboard/*" element={<RoleHomeRedirect />} />
-            <Route path="/ops" element={<Navigate to="/admin/ops" replace />} />
+            <Route path="/ops" element={<LegacyOpsRedirect />} />
 
             <Route path="*" element={<RoleHomeRedirect />} />
           </Routes>

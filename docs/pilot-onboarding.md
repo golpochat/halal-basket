@@ -62,7 +62,7 @@ Run with API + apps up. Tick each item.
 
 **Verified (local API, 2026-08-01):** register → pickup+scheduled → mock pay → shop prepare/ready/assign → driver today → delivered → ops `paid`/`completed`/`HALAL10`.  
 **Verified (browser UAT, 2026-08-01):** Lucan cart → switch to Swords → “Unavailable in Swords” + checkout disabled → **Remove unavailable** clears basket; shop / driver / ops logins load dashboards.  
-**Fix:** `CORS_ORIGINS` must include `5173,5174,5175` (shop/driver were blocked with “Failed to fetch”). Demo Shop zones restored to Lucan/Swords/Tallaght after OOS test.  
+**Fix:** `CORS_ORIGINS` must include `5173,5174,5175,5176` (shop/driver/admin were blocked with “Failed to fetch”). Demo Shop zones restored to Lucan/Swords/Tallaght after OOS test.  
 **Note:** deactivated orphan Lucan test shops (PhaseD A/B, Lucan Halal Mart) so routing hits **Halal Basket Demo Shop** for `shop@halalbasket.ie`.
 
 ### Payments
@@ -131,6 +131,8 @@ When ready: set `sk_test_…` / `pk_test_…` / webhook secret, `PAYMENT_PROVIDE
 
 **Next env:** Staging + Stripe test — see [deploy.md](./deploy.md) § Staging cutover checklist.
 
+**Product next (after local pilot):** Stripe/Staging → i18n packs → favourites — full ordered list in [`SYSTEM-COMPLETE.md`](../SYSTEM-COMPLETE.md).
+
 ## Onboard another shop
 
 1. Sign in as super-admin → **Platform** (or API below)
@@ -146,7 +148,7 @@ When ready: set `sk_test_…` / `pk_test_…` / webhook secret, `PAYMENT_PROVIDE
 2. Shop (`http://localhost:5174/`) — stock qty, status, assign driver, prep by date
 3. Driver (`http://localhost:5175/`) — today’s list → status → feedback
 4. Ops (`http://localhost:5176/admin/ops` or `/super-admin/ops`) — customers, block, refunds/complaints
-5. Platform (`http://localhost:5176/super-admin/…`) — fees, calendar, promos, warehouse, analytics, GDPR erase
+5. Platform (`http://localhost:5176/super-admin/…`) — fees, calendar, promos, warehouse, branding, featured categories, legal pages, analytics, GDPR erase
 
 ## Backups (minimum)
 

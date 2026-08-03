@@ -1,11 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { InfoPageShell } from '../../components/layout/InfoPageShell';
+import { useLocale } from '../../locale/LocaleContext';
 import { api } from '../../lib/api';
-import {
-  formatEuroFee,
-  type DeliveryFeeConfig,
-} from '../../lib/delivery-fee';
+import { type DeliveryFeeConfig } from '../../lib/delivery-fee';
 
 function titleCaseDay(day: string) {
   if (!day) return day;
@@ -13,6 +11,7 @@ function titleCaseDay(day: string) {
 }
 
 export function FaqPage() {
+  const { formatMoney } = useLocale();
   const [config, setConfig] = useState<DeliveryFeeConfig | null>(null);
 
   useEffect(() => {
@@ -33,14 +32,14 @@ export function FaqPage() {
 
   const freeOver = config?.freeDeliveryOverAmount ?? 0;
   const deliveryFeeLabel = config
-    ? formatEuroFee(config.scheduledDeliveryFee).toLowerCase()
+    ? formatMoney(config.scheduledDeliveryFee).toLowerCase()
     : 'the fee shown on Delivery charges';
   const pickupFeeLabel = config
-    ? formatEuroFee(config.pickupFee).toLowerCase()
+    ? formatMoney(config.pickupFee).toLowerCase()
     : 'as listed on Delivery charges';
   const freeOverClause =
     freeOver > 0
-      ? ` Free scheduled delivery applies when your items subtotal is €${freeOver.toFixed(2)} or more.`
+      ? ` Free scheduled delivery applies when your items subtotal is ${formatMoney(freeOver)} or more.`
       : '';
   const areaFeeNote =
     config?.areas?.some(

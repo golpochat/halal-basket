@@ -1,9 +1,10 @@
-import { ProfileEditor } from '@halal-basket/web';
+import { ProfileEditor, useDashboardTitle } from '@halal-basket/web';
 import { useAuth } from '../../auth/AuthContext';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
 
 export function ShopProfilePage() {
+  useDashboardTitle('Profile');
   const { session, setSession } = useAuth();
   if (!session) return null;
 

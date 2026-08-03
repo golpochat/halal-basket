@@ -98,7 +98,11 @@ export class AuthService {
       data: { failedLoginCount: 0, lockedUntil: null },
     });
 
-    return this.tokenResponse(user.id, user.email, user.role, user.avatarUrl);
+    const access = await this.staffAccess(user.id, user.role);
+    return {
+      ...this.tokenResponse(user.id, user.email, user.role, user.avatarUrl),
+      ...access,
+    };
   }
 
   async getProfile(userId: string) {
@@ -113,7 +117,8 @@ export class AuthService {
     if (!user || !user.isActive) {
       throw new UnauthorizedException('User not found');
     }
-    return this.profileResponse(user);
+    const access = await this.staffAccess(user.id, user.role);
+    return { ...this.profileResponse(user), ...access };
   }
 
   async updateProfile(userId: string, dto: UpdateProfileDto) {
@@ -235,6 +240,7 @@ export class AuthService {
         refreshed.role,
         refreshed.avatarUrl,
       ),
+      ...(await this.staffAccess(refreshed.id, refreshed.role)),
       profile: this.profileResponse(refreshed),
     };
   }
@@ -361,6 +367,63 @@ export class AuthService {
       addressList: user.customer
         ? this.readAddressList(user.customer.addressList)
         : undefined,
+    };
+  }
+
+  private async staffAccess(userId: string, role: UserRole) {
+    if (role === UserRole.super_admin) {
+      const all = await this.prisma.permission.findMany({
+        select: { key: true },
+        orderBy: { key: 'asc' },
+      });
+      const staffRole = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          staffRole: { select: { id: true, name: true, slug: true } },
+        },
+      });
+      return {
+        staffRole: staffRole?.staffRole ?? {
+          id: '00000000-0000-4000-8000-0000000000a1',
+          name: 'Super admin',
+          slug: 'super-admin',
+        },
+        permissions: all.map((p) => p.key),
+      };
+    }
+
+    if (role !== UserRole.admin) {
+      return { staffRole: null, permissions: [] as string[] };
+    }
+
+    const row = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        staffRole: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            isActive: true,
+            permissions: {
+              select: { permission: { select: { key: true } } },
+            },
+          },
+        },
+      },
+    });
+    if (!row?.staffRole?.isActive) {
+      return { staffRole: null, permissions: [] as string[] };
+    }
+    return {
+      staffRole: {
+        id: row.staffRole.id,
+        name: row.staffRole.name,
+        slug: row.staffRole.slug,
+      },
+      permissions: row.staffRole.permissions
+        .map((p) => p.permission.key)
+        .sort(),
     };
   }
 

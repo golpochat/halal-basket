@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { SelectInput } from '@halal-basket/web';
-import { RequireAuth, RequireRole } from '../../auth/guards';
+import { RequireAuth, RequirePermission } from '../../auth/guards';
 import { useAuth } from '../../auth/AuthContext';
 import { api } from '../../lib/api';
 import { Flash } from './Flash';
@@ -9,9 +9,9 @@ import type { Shop } from './types';
 export function AdminCataloguePage() {
   return (
     <RequireAuth>
-      <RequireRole roles={['super_admin']}>
+      <RequirePermission permissions={['catalogue.read']}>
         <CatalogueInner />
-      </RequireRole>
+      </RequirePermission>
     </RequireAuth>
   );
 }
@@ -19,6 +19,9 @@ export function AdminCataloguePage() {
 function CatalogueInner() {
   const { session } = useAuth();
   const token = session!.accessToken;
+  const isSuper = session!.user.role === 'super_admin';
+  const canWrite =
+    isSuper || (session!.permissions ?? []).includes('catalogue.write');
   const [error, setError] = useState('');
   const [msg, setMsg] = useState('');
   const [shops, setShops] = useState<Shop[]>([]);
@@ -79,18 +82,20 @@ function CatalogueInner() {
               onChange={setShopId}
               placeholder="Select shop"
             />
-            <label className="hb-btn hb-btn-ghost cursor-pointer">
-              Import CSV
-              <input
-                type="file"
-                accept=".csv,.xlsx,.xls"
-                className="hidden"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) void importCsv(f);
-                }}
-              />
-            </label>
+            {canWrite ? (
+              <label className="hb-btn hb-btn-ghost cursor-pointer">
+                Import CSV
+                <input
+                  type="file"
+                  accept=".csv,.xlsx,.xls"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) void importCsv(f);
+                  }}
+                />
+              </label>
+            ) : null}
             <a
               className="hb-btn hb-btn-ghost"
               href={`${import.meta.env.VITE_API_URL ?? 'http://localhost:3000'}/admin/products/export?format=csv`}

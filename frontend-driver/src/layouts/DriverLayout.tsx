@@ -5,7 +5,7 @@ import { useAuth } from '../auth/AuthContext';
 import { BrandLogo } from '../components/brand/BrandLogo';
 
 const driverNav: DashboardNavItem[] = [
-  { to: '/driver/dashboard', label: 'Dashboard', end: true, icon: 'truck' },
+  { to: '/driver/dashboard', label: 'Open deliveries', end: true, icon: 'truck' },
   { to: '/driver/history', label: 'History', icon: 'list' },
 ];
 

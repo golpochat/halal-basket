@@ -10,9 +10,7 @@ import { formatUserFacingError, toastError } from '@halal-basket/web';
 import {
   api,
   AuthSession,
-  authHandoffUrl,
   homeForRole,
-  isExternalHome,
 } from '../lib/api';
 
 export function LoginPage() {
@@ -41,19 +39,15 @@ function LoginForm() {
         method: 'POST',
         body: JSON.stringify({ email, password }),
       });
-      const next = params.get('next');
-      const dest =
-        next && next.startsWith('/')
-          ? next
-          : homeForRole(result.user.role);
-
-      if (isExternalHome(dest)) {
-        window.location.assign(authHandoffUrl(dest, result));
+      if (result.user.role !== 'customer') {
+        const msg = 'This portal is for customer accounts only.';
+        setError(msg);
+        toastError(msg);
         return;
       }
-
       setSession(result);
-      navigate(dest);
+      const next = params.get('next');
+      navigate(next?.startsWith('/') ? next : homeForRole(result.user.role));
     } catch (err) {
       const msg = formatUserFacingError(err, 'Could not sign in');
       setError(msg);

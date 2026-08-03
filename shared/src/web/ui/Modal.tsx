@@ -1,5 +1,46 @@
-import { useEffect, type ReactNode } from 'react';
-import { Button } from './Button';
+import { useEffect, useLayoutEffect, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
+
+function useDashboardModalInset(open: boolean): number {
+  const [insetLeft, setInsetLeft] = useState(0);
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setInsetLeft(0);
+      return;
+    }
+
+    function measure() {
+      const dashboard = document.querySelector('.hb-dashboard');
+      const sidebar = document.querySelector('.hb-dashboard__sidebar');
+      if (
+        !dashboard ||
+        !sidebar ||
+        !window.matchMedia('(min-width: 640px)').matches
+      ) {
+        setInsetLeft(0);
+        return;
+      }
+      setInsetLeft(Math.round(sidebar.getBoundingClientRect().width));
+    }
+
+    measure();
+    window.addEventListener('resize', measure);
+    const sidebar = document.querySelector('.hb-dashboard__sidebar');
+    const observer =
+      sidebar && typeof ResizeObserver !== 'undefined'
+        ? new ResizeObserver(measure)
+        : null;
+    if (sidebar && observer) observer.observe(sidebar);
+
+    return () => {
+      window.removeEventListener('resize', measure);
+      observer?.disconnect();
+    };
+  }, [open]);
+
+  return insetLeft;
+}
 
 export function Modal({
   open,
@@ -14,6 +55,8 @@ export function Modal({
   children: ReactNode;
   footer?: ReactNode;
 }) {
+  const insetLeft = useDashboardModalInset(open);
+
   useEffect(() => {
     if (!open) return;
     function onKey(e: KeyboardEvent) {
@@ -30,8 +73,11 @@ export function Modal({
 
   if (!open) return null;
 
-  return (
-    <div className="fixed inset-0 z-[120] flex items-end justify-center bg-black/35 p-0 sm:items-center sm:p-4">
+  return createPortal(
+    <div
+      className="fixed inset-y-0 right-0 z-[120] flex items-center justify-center bg-black/35 p-4 max-sm:items-end max-sm:p-0"
+      style={{ left: insetLeft }}
+    >
       <button
         type="button"
         className="absolute inset-0 cursor-default"
@@ -54,9 +100,13 @@ export function Modal({
           >
             {title}
           </h2>
-          <Button variant="tertiary" size="sm" onClick={onClose}>
+          <button
+            type="button"
+            className="hb-btn hb-btn-ghost px-3 py-1.5 text-sm"
+            onClick={onClose}
+          >
             Close
-          </Button>
+          </button>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">
           {children}
@@ -67,6 +117,7 @@ export function Modal({
           </div>
         ) : null}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

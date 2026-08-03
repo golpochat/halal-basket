@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './auth/AuthContext';
 import { LocaleProvider } from './locale/LocaleContext';
 import { ToastViewport } from '@halal-basket/web';
+import { CookieConsentBanner } from './components/layout/CookieConsentBanner';
 import { AccountLayout } from './layouts/AccountLayout';
 import { LoginPage } from './pages/LoginPage';
 import { CustomerRegisterPage } from './pages/customer/RegisterPage';
@@ -13,12 +14,12 @@ import { OrdersPage as CustomerOrdersPage } from './pages/customer/OrdersPage';
 import { FaqPage } from './pages/customer/FaqPage';
 import { DeliveryLocationsPage } from './pages/customer/DeliveryLocationsPage';
 import { DeliveryChargesPage } from './pages/customer/DeliveryChargesPage';
-import { PrivacyPage } from './pages/customer/PrivacyPage';
-import { TermsPage } from './pages/customer/TermsPage';
+import { LegalDocumentPage } from './pages/customer/LegalDocumentPage';
 import { RedirectToAdminApp } from './pages/RedirectToAdminApp';
 import { RedirectDashboardOrder } from './pages/RedirectDashboardOrder';
 import { CustomerProfilePage } from './pages/customer/ProfilePage';
 import { CustomerAddressesPage } from './pages/customer/AddressesPage';
+import { CustomerFavouritesPage } from './pages/customer/FavouritesPage';
 
 export default function App() {
   return (
@@ -50,8 +51,15 @@ export default function App() {
               path="/delivery-charge"
               element={<Navigate to="/delivery-charges" replace />}
             />
-            <Route path="/privacy" element={<PrivacyPage />} />
-            <Route path="/terms" element={<TermsPage />} />
+            <Route path="/legal/:slug" element={<LegalDocumentPage />} />
+            <Route
+              path="/privacy"
+              element={<Navigate to="/legal/privacy" replace />}
+            />
+            <Route
+              path="/terms"
+              element={<Navigate to="/legal/terms" replace />}
+            />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<CustomerRegisterPage />} />
 
@@ -68,6 +76,7 @@ export default function App() {
               <Route path="orders/:id" element={<CustomerOrdersPage />} />
               <Route path="profile" element={<CustomerProfilePage />} />
               <Route path="addresses" element={<CustomerAddressesPage />} />
+              <Route path="favourites" element={<CustomerFavouritesPage />} />
             </Route>
 
             <Route
@@ -91,6 +100,7 @@ export default function App() {
 
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          <CookieConsentBanner />
           <ToastViewport />
         </BrowserRouter>
       </LocaleProvider>

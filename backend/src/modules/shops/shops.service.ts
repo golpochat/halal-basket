@@ -2,7 +2,10 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, ShopKind } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateShopDto, UpsertShopProductDto } from './dto/shop.dto';
-import { WAREHOUSE_PUBLISHED_SETTING_KEY } from '../platform-locale/platform-locale.service';
+import {
+  activeShopsWithPublishedWarehouses,
+  getPublishedWarehouseIds,
+} from '../platform-locale/warehouse-publish';
 import { StockService } from '../stock/stock.service';
 
 @Injectable()
@@ -63,28 +66,16 @@ export class ShopsService {
     });
   }
 
-  private async isWarehousePublished() {
-    const row = await this.prisma.platformSetting.findUnique({
-      where: { key: WAREHOUSE_PUBLISHED_SETTING_KEY },
-    });
-    return row?.value === 'true';
-  }
-
   /**
    * Brand-facing catalogue: one row per product across active shops.
    * When `area` is set, only shops whose deliveryZones include that area.
-   * Warehouse stock included only when warehouse fulfillment is published.
+   * Warehouse stock included only for published warehouse IDs.
    * No shop id/name in the response.
    */
   async listPlatformCatalogue(area?: string) {
-    const warehousePublished = await this.isWarehousePublished();
+    const publishedWarehouseIds = await getPublishedWarehouseIds(this.prisma);
     const shops = await this.prisma.shop.findMany({
-      where: {
-        isActive: true,
-        ...(warehousePublished
-          ? {}
-          : { kind: ShopKind.shop }),
-      },
+      where: activeShopsWithPublishedWarehouses(publishedWarehouseIds),
     });
     const areaNorm = area?.trim().toLowerCase() ?? '';
     const shopIds = shops

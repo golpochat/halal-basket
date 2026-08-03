@@ -14,9 +14,9 @@ import { useAuth } from '../../auth/AuthContext';
 import { SiteHeader } from '../../components/layout/SiteHeader';
 import { SiteFooter } from '../../components/layout/SiteFooter';
 import { LocalePickers } from '../../components/LocalePickers';
+import { useLocale } from '../../locale/LocaleContext';
 import { api } from '../../lib/api';
 import {
-  formatEuroFee,
   resolveDeliveryFee,
   type DeliveryFeeConfig,
 } from '../../lib/delivery-fee';
@@ -36,14 +36,6 @@ type CheckoutDraft = {
   couponCode?: string | null;
 };
 
-type Features = {
-  realtimeDelivery: boolean;
-  multiShop: boolean;
-  realtimeEtaMinutes?: number;
-};
-
-type Mode = 'pickup' | 'scheduled_delivery' | 'realtime_delivery';
-
 type CalendarRow = {
   id: string;
   areaName: string;
@@ -57,7 +49,11 @@ type ResolveResult = {
 
 type DeliveryConfig = DeliveryFeeConfig;
 
-const STEPS = ['Cart', 'Fulfillment', 'Location', 'Confirm'] as const;
+/** Location-based scheduled delivery only; pickup/realtime stay in the API for later. */
+const FULFILLMENT_MODE = 'scheduled_delivery' as const;
+
+const STEPS = ['Basket', 'Delivery', 'Confirm'] as const;
+const LAST_STEP = STEPS.length - 1;
 
 export function CheckoutPage() {
   return (
@@ -71,6 +67,7 @@ export function CheckoutPage() {
 
 function CheckoutWizard() {
   const { session } = useAuth();
+  const { formatMoney } = useLocale();
   const navigate = useNavigate();
   const draft = useMemo(() => {
     try {
@@ -83,12 +80,10 @@ function CheckoutWizard() {
   }, []);
 
   const [step, setStep] = useState(0);
-  const [features, setFeatures] = useState<Features | null>(null);
   const [calendar, setCalendar] = useState<CalendarRow[]>([]);
   const [deliveryConfig, setDeliveryConfig] = useState<DeliveryConfig | null>(
     null,
   );
-  const [mode, setMode] = useState<Mode>('pickup');
   const [area, setArea] = useState(draft?.area ?? '');
   const [address, setAddress] = useState('');
   const [eircode, setEircode] = useState('');
@@ -106,6 +101,7 @@ function CheckoutWizard() {
   const [appliedCoupon, setAppliedCoupon] = useState<string | null>(null);
   const [holdId, setHoldId] = useState<string | null>(null);
   const [holdExpiresAt, setHoldExpiresAt] = useState<string | null>(null);
+  const [addressesReady, setAddressesReady] = useState(false);
 
   const areas = useMemo(() => {
     return Array.from(new Set(calendar.map((r) => r.areaName))).sort();
@@ -117,15 +113,36 @@ function CheckoutWizard() {
     );
   }, [draft]);
 
+  const areaOptions = useMemo(() => {
+    return areas.map((name) => {
+      if (!deliveryConfig) return { value: name, label: name };
+      const fee = resolveDeliveryFee({
+        mode: FULFILLMENT_MODE,
+        areaName: name,
+        subtotal: itemsSubtotal,
+        config: deliveryConfig,
+      });
+      return {
+        value: name,
+        label: name,
+        meta: fee === 0 ? 'Free' : formatMoney(fee),
+      };
+    });
+  }, [areas, deliveryConfig, itemsSubtotal, formatMoney]);
+
+  const itemCount = useMemo(() => {
+    return draft?.items.reduce((sum, i) => sum + i.quantity, 0) ?? 0;
+  }, [draft]);
+
   const deliveryFee = useMemo(() => {
     if (!deliveryConfig) return 0;
     return resolveDeliveryFee({
-      mode,
+      mode: FULFILLMENT_MODE,
       areaName: area,
       subtotal: itemsSubtotal,
       config: deliveryConfig,
     });
-  }, [deliveryConfig, mode, area, itemsSubtotal]);
+  }, [deliveryConfig, area, itemsSubtotal]);
 
   const estimatedTotal = Math.max(
     0,
@@ -140,20 +157,38 @@ function CheckoutWizard() {
     );
   }, [draft, unavailableIds]);
 
+  const normalizedEircode = normalizeEircode(eircode);
+
+  const addressByLineAndEircode = useMemo(() => {
+    if (!address.trim() || !normalizedEircode) return undefined;
+    return savedAddresses.find(
+      (a) =>
+        a.line1 === address.trim() &&
+        normalizeEircode(a.eircode) === normalizedEircode,
+    );
+  }, [savedAddresses, address, normalizedEircode]);
+
+  const areaMismatch =
+    !!addressByLineAndEircode &&
+    addressByLineAndEircode.area_name !== area;
+
+  const selectedSavedId =
+    savedAddresses.find(
+      (a) =>
+        a.line1 === address.trim() &&
+        a.area_name === area &&
+        normalizeEircode(a.eircode) === normalizedEircode,
+    )?.id ?? '';
+
+  const addressesForArea = useMemo(() => {
+    if (!area) return savedAddresses;
+    return savedAddresses.filter((a) => a.area_name === area);
+  }, [savedAddresses, area]);
+
   useEffect(() => {
-    api<Features>('/features')
-      .then(setFeatures)
-      .catch(() =>
-        setFeatures({
-          realtimeDelivery: false,
-          multiShop: false,
-          realtimeEtaMinutes: 60,
-        }),
-      );
     api<CalendarRow[]>('/delivery-calendar')
       .then((rows) => {
         setCalendar(rows);
-        setArea((prev) => prev || rows[0]?.areaName || '');
       })
       .catch(() => setCalendar([]));
     api<DeliveryConfig>('/platform/delivery-config')
@@ -167,29 +202,60 @@ function CheckoutWizard() {
     api<ProfileAddresses>('/auth/me', { token: session.accessToken })
       .then((p) => {
         if (cancelled) return;
-        const list = p.addressList ?? [];
-        setSavedAddresses(list);
-        const def = list.find((a) => a.isDefault) ?? list[0];
-        if (!def) return;
-        setAddress((prev) => {
-          if (prev.trim()) return prev;
-          setAddressPrefillNote('Using your default saved address');
-          setEircode((e) => (e.trim() ? e : def.eircode));
-          return def.line1;
-        });
-        if (!draft?.area) {
-          setArea((prev) => def.area_name || prev);
-        }
+        setSavedAddresses(p.addressList ?? []);
+        setAddressesReady(true);
       })
-      .catch(() => undefined);
+      .catch(() => {
+        if (!cancelled) {
+          setSavedAddresses([]);
+          setAddressesReady(true);
+        }
+      });
     return () => {
       cancelled = true;
     };
-  }, [session?.accessToken, draft?.area]);
+  }, [session?.accessToken]);
+
+  // Resolve area + address together once calendar and profile addresses are ready.
+  useEffect(() => {
+    if (!areas.length || !addressesReady) return;
+
+    const draftArea =
+      draft?.area && areas.includes(draft.area) ? draft.area : '';
+    const def = savedAddresses.find((a) => a.isDefault) ?? savedAddresses[0];
+    const defArea =
+      def?.area_name && areas.includes(def.area_name) ? def.area_name : '';
+
+    setArea((prev) => {
+      if (prev && areas.includes(prev)) return prev;
+      return draftArea || defArea || areas[0] || '';
+    });
+  }, [areas, addressesReady, savedAddresses, draft?.area]);
+
+  useEffect(() => {
+    if (!addressesReady || !area) return;
+    setAddress((addrPrev) => {
+      if (addrPrev.trim()) return addrPrev;
+      const match =
+        savedAddresses.find((a) => a.area_name === area && a.isDefault) ??
+        savedAddresses.find((a) => a.area_name === area);
+      if (!match) {
+        setAddressPrefillNote('');
+        return '';
+      }
+      setAddressPrefillNote(
+        match.isDefault
+          ? 'Using your default saved address'
+          : `Using saved address (${match.label})`,
+      );
+      setEircode((e) => (e.trim() ? e : match.eircode));
+      return match.line1;
+    });
+  }, [addressesReady, area, savedAddresses]);
 
   useEffect(() => {
     const code = draft?.couponCode?.trim();
-    if (!code || itemsSubtotal <= 0) {
+    if (!code || itemsSubtotal <= 0 || !session?.accessToken) {
       setCouponDiscount(0);
       setAppliedCoupon(null);
       return;
@@ -202,6 +268,7 @@ function CheckoutWizard() {
       message: string;
     }>('/platform/coupons/validate', {
       method: 'POST',
+      token: session.accessToken,
       body: JSON.stringify({ code, subtotal: itemsSubtotal }),
     })
       .then((res) => {
@@ -223,16 +290,17 @@ function CheckoutWizard() {
     return () => {
       cancelled = true;
     };
-  }, [draft?.couponCode, itemsSubtotal]);
+  }, [draft?.couponCode, itemsSubtotal, session]);
 
   useEffect(() => {
-    if (!area || mode === 'pickup' || mode === 'realtime_delivery') {
+    if (!area) {
       setNextDelivery(null);
-      setAreaError(
-        area && mode === 'realtime_delivery' && !areas.includes(area)
-          ? 'Choose a served delivery area'
-          : '',
-      );
+      setAreaError('');
+      return;
+    }
+    if (!areas.includes(area)) {
+      setNextDelivery(null);
+      setAreaError('Choose a served delivery area');
       return;
     }
     api<ResolveResult>(
@@ -246,10 +314,10 @@ function CheckoutWizard() {
         setNextDelivery(null);
         setAreaError(e instanceof Error ? e.message : 'Area not served');
       });
-  }, [area, mode, areas]);
+  }, [area, areas]);
 
   useEffect(() => {
-    if (step !== 3 || !session || !draft?.items.length || !area) {
+    if (step !== LAST_STEP || !session || !draft?.items.length || !area) {
       setPreviewOk(null);
       setUnavailableIds([]);
       setPreviewMessage('');
@@ -257,21 +325,10 @@ function CheckoutWizard() {
       setHoldExpiresAt(null);
       return;
     }
-    if (mode === 'scheduled_delivery' && !nextDelivery) {
+    if (!nextDelivery) {
       setPreviewOk(false);
       setUnavailableIds([]);
       setPreviewMessage('Choose a valid delivery area first');
-      setHoldId(null);
-      setHoldExpiresAt(null);
-      return;
-    }
-    if (
-      (mode === 'realtime_delivery' || mode === 'pickup') &&
-      !areas.includes(area)
-    ) {
-      setPreviewOk(false);
-      setUnavailableIds([]);
-      setPreviewMessage('Choose a valid area first');
       setHoldId(null);
       setHoldExpiresAt(null);
       return;
@@ -285,23 +342,16 @@ function CheckoutWizard() {
       productId,
       quantity,
     }));
-    const body =
-      mode === 'pickup'
-        ? {
-            fulfillmentMode: 'pickup' as const,
-            deliveryAreaName: area,
-            items,
-          }
-        : {
-            fulfillmentMode: mode,
-            deliveryAreaName: area,
-            deliveryAddress: {
-              line1: address,
-              eircode: normalizeEircode(eircode),
-              area_name: area,
-            },
-            items,
-          };
+    const body = {
+      fulfillmentMode: FULFILLMENT_MODE,
+      deliveryAreaName: area,
+      deliveryAddress: {
+        line1: address,
+        eircode: normalizeEircode(eircode),
+        area_name: area,
+      },
+      items,
+    };
 
     api<{
       ok: boolean;
@@ -359,30 +409,58 @@ function CheckoutWizard() {
     return () => {
       cancelled = true;
     };
-  }, [step, session, draft, area, mode, address, eircode, nextDelivery]);
+  }, [step, session, draft, area, address, eircode, nextDelivery]);
 
   if (!draft?.items?.length) {
     return <Navigate to="/" replace />;
   }
 
+  function applySavedAddress(picked: CustomerAddress) {
+    setAddress(picked.line1);
+    setEircode(picked.eircode);
+    setArea(picked.area_name);
+    setAddressPrefillNote(
+      picked.isDefault
+        ? 'Using your default saved address'
+        : `Using saved address (${picked.label})`,
+    );
+  }
+
+  function onAreaChange(nextArea: string) {
+    setArea(nextArea);
+    const stillValid =
+      addressByLineAndEircode &&
+      addressByLineAndEircode.area_name === nextArea;
+    if (stillValid) {
+      setAddressPrefillNote(
+        addressByLineAndEircode.isDefault
+          ? 'Using your default saved address'
+          : `Using saved address (${addressByLineAndEircode.label})`,
+      );
+      return;
+    }
+    const match =
+      savedAddresses.find(
+        (a) => a.area_name === nextArea && a.isDefault,
+      ) ?? savedAddresses.find((a) => a.area_name === nextArea);
+    if (match) {
+      applySavedAddress(match);
+      return;
+    }
+    setAddress('');
+    setEircode('');
+    setAddressPrefillNote(
+      'Enter an address in this delivery area, or pick a saved one',
+    );
+  }
+
   function canNext() {
     if (step === 1) {
-      if (!mode) return false;
-      if (
-        (mode === 'scheduled_delivery' || mode === 'realtime_delivery') &&
-        areas.length === 0
-      ) {
-        return false;
-      }
-      return true;
-    }
-    if (step === 2) {
-      if (!area || !areas.includes(area)) return false;
-      if (mode === 'pickup') return true;
+      if (!area || !areas.includes(area) || areaError) return false;
+      if (areaMismatch) return false;
       const addressOk =
-        address.trim().length > 3 && isValidEircode(eircode) && !areaError;
-      if (mode === 'realtime_delivery') return addressOk;
-      return addressOk && !!nextDelivery;
+        address.trim().length > 3 && isValidEircode(eircode) && !!nextDelivery;
+      return addressOk;
     }
     return true;
   }
@@ -419,14 +497,18 @@ function CheckoutWizard() {
       return;
     }
     if (!areas.includes(area)) {
+      showCheckoutError('Choose a delivery area before placing order');
+      return;
+    }
+    if (!nextDelivery) {
       showCheckoutError(
-        'Choose a collection or delivery area before placing order',
+        'Choose a delivery area from the calendar before placing order',
       );
       return;
     }
-    if (mode === 'scheduled_delivery' && !nextDelivery) {
+    if (areaMismatch) {
       showCheckoutError(
-        'Choose a delivery area from the calendar before placing order',
+        'Delivery area must match the saved address area',
       );
       return;
     }
@@ -437,27 +519,18 @@ function CheckoutWizard() {
         productId,
         quantity,
       }));
-      const body =
-        mode === 'pickup'
-          ? {
-              fulfillmentMode: 'pickup',
-              deliveryAreaName: area,
-              items,
-              couponCode: appliedCoupon || undefined,
-              holdId,
-            }
-          : {
-              fulfillmentMode: mode,
-              deliveryAreaName: area,
-              deliveryAddress: {
-                line1: address,
-                eircode: normalizeEircode(eircode),
-                area_name: area,
-              },
-              items,
-              couponCode: appliedCoupon || undefined,
-              holdId,
-            };
+      const body = {
+        fulfillmentMode: FULFILLMENT_MODE,
+        deliveryAreaName: area,
+        deliveryAddress: {
+          line1: address,
+          eircode: normalizeEircode(eircode),
+          area_name: area,
+        },
+        items,
+        couponCode: appliedCoupon || undefined,
+        holdId,
+      };
       const order = await api<{ id: string }>('/orders', {
         method: 'POST',
         token: session.accessToken,
@@ -488,178 +561,153 @@ function CheckoutWizard() {
         actions={<LocalePickers />}
       />
       <main className="mx-auto w-full max-w-xl flex-1 px-4 py-8 sm:px-6">
-      <h1 className="font-display text-3xl font-semibold">Checkout</h1>
-      <div className="mt-4 flex gap-2">
-        {STEPS.map((label, i) => (
-          <div key={label} className="flex-1">
-            <div
-              className={`h-1.5 rounded-full ${
-                i <= step ? 'bg-[var(--hb-green)]' : 'bg-[var(--hb-mist)]'
-              }`}
-            />
-            <p className="mt-1.5 text-xs font-medium text-[var(--hb-ink)]/55">
-              {label}
-            </p>
-          </div>
-        ))}
-      </div>
-
-      <form
-        onSubmit={
-          step === 3
-            ? placeOrder
-            : (e) => {
-                e.preventDefault();
-                if (canNext()) setStep((s) => Math.min(3, s + 1));
-              }
-        }
-        className="hb-surface mt-6 space-y-5 p-6 shadow-sm"
-      >
-        {step === 0 && (
-          <div className="space-y-3">
-            <p className="font-medium">Review your basket</p>
-            <ul className="space-y-2 text-sm">
-              {draft.items.map((i) => (
-                <li
-                  key={i.productId}
-                  className="flex justify-between rounded-lg bg-[var(--hb-mist)]/60 px-3 py-2"
-                >
-                  <span>{i.name ?? `${i.productId.slice(0, 8)}…`}</span>
-                  <span>× {i.quantity}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {step === 1 && (
-          <fieldset className="space-y-3">
-            <legend className="font-medium">How should we fulfill this?</legend>
-            {(
-              [
-                ['pickup', 'Pickup from Halal Basket'],
-                ['scheduled_delivery', 'Scheduled delivery'],
-                ...(features?.realtimeDelivery
-                  ? ([['realtime_delivery', 'Realtime delivery']] as const)
-                  : []),
-              ] as Array<[Mode, string]>
-            ).map(([value, label]) => (
-              <label
-                key={value}
-                className={`flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 ${
-                  mode === value
-                    ? 'border-[var(--hb-green)] bg-[var(--hb-mist)]'
-                    : 'border-transparent bg-white/70'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="mode"
-                  checked={mode === value}
-                  onChange={() => setMode(value)}
+        <h1 className="font-display text-3xl font-semibold">Checkout</h1>
+        <div className="mt-4 flex gap-2">
+          {STEPS.map((label, i) => {
+            const done = i < step;
+            const current = i === step;
+            return (
+              <div key={label} className="flex-1">
+                <div
+                  className={`h-1.5 rounded-full ${
+                    done || current
+                      ? 'bg-[var(--hb-green)]'
+                      : 'bg-[var(--hb-mist)]'
+                  } ${current ? 'opacity-100' : done ? 'opacity-70' : ''}`}
                 />
-                <span>
+                <p
+                  className={`mt-1.5 text-xs font-medium ${
+                    current
+                      ? 'text-[var(--hb-ink)]'
+                      : 'text-[var(--hb-ink)]/55'
+                  }`}
+                >
                   {label}
-                  {value === 'realtime_delivery' && (
-                    <span className="mt-0.5 block text-xs font-normal text-[var(--hb-ink)]/55">
-                      Same-day ASAP · typically within{' '}
-                      {features?.realtimeEtaMinutes ?? 60} minutes when stock
-                      allows
-                    </span>
-                  )}
-                </span>
-              </label>
-            ))}
-            {mode !== 'pickup' && areas.length === 0 && (
-              <p className="text-sm text-red-700">
-                No delivery areas are configured yet. Choose pickup or check
-                back later.
-              </p>
-            )}
-          </fieldset>
-        )}
+                </p>
+              </div>
+            );
+          })}
+        </div>
 
-        {step === 2 && (
-          <div className="space-y-4">
-            <LocationSelect
-              variant="field"
-              label={mode === 'pickup' ? 'Collection area' : 'Delivery area'}
-              value={area}
-              options={areas}
-              onChange={setArea}
-              required
-              placeholder="Select area"
-            />
-            {mode === 'pickup' && (
-              <p className="text-sm text-[var(--hb-ink)]/65">
-                We assign the nearest Halal Basket pickup point with your items
-                in stock. The collection address appears after you place the
-                order.
-              </p>
-            )}
-            {mode === 'realtime_delivery' && (
-              <p className="rounded-lg bg-[var(--hb-mist)] px-3 py-2 text-sm">
-                Realtime delivery aims for ASAP — estimated within{' '}
-                <strong>{features?.realtimeEtaMinutes ?? 60} minutes</strong>{' '}
-                after confirmation when a shop in your area has stock.
-              </p>
-            )}
-            {mode === 'scheduled_delivery' && nextDelivery && (
-              <p className="rounded-lg bg-[var(--hb-mist)] px-3 py-2 text-sm">
-                Next delivery:{' '}
-                <strong>
-                  {new Date(nextDelivery.deliveryDate).toLocaleDateString(
-                    undefined,
-                    {
-                      weekday: 'long',
-                      year: 'numeric',
-                      month: 'short',
-                      day: 'numeric',
-                    },
-                  )}
-                </strong>{' '}
-                ({nextDelivery.deliveryDay})
-              </p>
-            )}
-            {mode !== 'pickup' && areaError && (
-              <p className="text-sm text-red-700">{areaError}</p>
-            )}
-            {mode !== 'pickup' && savedAddresses.length > 0 && (
-              <SelectInput
-                label="Saved address"
-                placeholder="Choose saved address…"
-                value={
-                  savedAddresses.find(
-                    (a) =>
-                      a.line1 === address &&
-                      a.area_name === area &&
-                      a.eircode === normalizeEircode(eircode),
-                  )?.id ?? ''
+        <form
+          onSubmit={
+            step === LAST_STEP
+              ? placeOrder
+              : (e) => {
+                  e.preventDefault();
+                  if (canNext()) setStep((s) => Math.min(LAST_STEP, s + 1));
                 }
-                options={savedAddresses.map((a) => ({
-                  value: a.id,
-                  label: `${a.label}${a.isDefault ? ' (default)' : ''} — ${a.area_name}`,
-                }))}
-                onChange={(id) => {
-                  const picked = savedAddresses.find((a) => a.id === id);
-                  if (!picked) return;
-                  setAddress(picked.line1);
-                  setEircode(picked.eircode);
-                  setArea(picked.area_name);
-                  setAddressPrefillNote(
-                    picked.isDefault
-                      ? 'Using your default saved address'
-                      : `Using saved address (${picked.label})`,
+          }
+          className="hb-surface mt-6 space-y-5 p-6 shadow-sm"
+        >
+          {step === 0 && (
+            <div className="space-y-3">
+              <div className="flex items-baseline justify-between gap-3">
+                <p className="font-medium">Review your basket</p>
+                <Link
+                  to="/"
+                  className="text-sm font-medium text-[var(--hb-green)] underline-offset-2 hover:underline"
+                >
+                  Edit basket
+                </Link>
+              </div>
+              <ul className="space-y-2 text-sm">
+                {draft.items.map((i) => {
+                  const line = (i.price ?? 0) * i.quantity;
+                  return (
+                    <li
+                      key={i.productId}
+                      className="flex items-start justify-between gap-3 rounded-lg bg-[var(--hb-mist)]/60 px-3 py-2"
+                    >
+                      <span>
+                        {i.name ?? `${i.productId.slice(0, 8)}…`}
+                        <span className="mt-0.5 block text-xs text-[var(--hb-ink)]/55">
+                          {formatMoney(i.price ?? 0)} × {i.quantity}
+                        </span>
+                      </span>
+                      <span className="shrink-0 font-medium">
+                        {formatMoney(line)}
+                      </span>
+                    </li>
                   );
-                }}
-              />
-            )}
-            {mode !== 'pickup' && addressPrefillNote && (
-              <p className="text-xs text-[var(--hb-ink)]/55">
-                {addressPrefillNote}
+                })}
+              </ul>
+              <p className="flex justify-between border-t border-[rgba(26,92,58,0.1)] pt-3 text-sm font-semibold">
+                <span>Subtotal</span>
+                <span>{formatMoney(itemsSubtotal)}</span>
               </p>
-            )}
-            {mode !== 'pickup' && (
+            </div>
+          )}
+
+          {step === 1 && (
+            <div className="space-y-4">
+              <p className="font-medium">Where should we deliver?</p>
+              {areas.length === 0 && (
+                <p className="text-sm text-red-700">
+                  No delivery areas are configured yet. Check back later.
+                </p>
+              )}
+              <LocationSelect
+                variant="field"
+                label="Delivery area"
+                value={area}
+                options={areaOptions}
+                onChange={onAreaChange}
+                required
+                placeholder="Select area"
+              />
+              {nextDelivery && (
+                <p className="rounded-lg bg-[var(--hb-mist)] px-3 py-2 text-sm">
+                  Next delivery:{' '}
+                  <strong>
+                    {new Date(nextDelivery.deliveryDate).toLocaleDateString(
+                      undefined,
+                      {
+                        weekday: 'long',
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                      },
+                    )}
+                  </strong>
+                </p>
+              )}
+              {areaError && (
+                <p className="text-sm text-red-700">{areaError}</p>
+              )}
+              {areaMismatch && (
+                <p className="text-sm text-red-700">
+                  This address is saved under{' '}
+                  <strong>{addressByLineAndEircode?.area_name}</strong>, not{' '}
+                  <strong>{area}</strong>. Pick a matching saved address or
+                  change the delivery area.
+                </p>
+              )}
+              {savedAddresses.length > 0 && (
+                <SelectInput
+                  label="Saved address"
+                  placeholder={
+                    addressesForArea.length
+                      ? 'Choose saved address…'
+                      : 'No saved addresses in this area'
+                  }
+                  value={selectedSavedId}
+                  options={addressesForArea.map((a) => ({
+                    value: a.id,
+                    label: `${a.label}${a.isDefault ? ' (default)' : ''} — ${a.line1}`,
+                  }))}
+                  onChange={(id) => {
+                    const picked = savedAddresses.find((a) => a.id === id);
+                    if (!picked) return;
+                    applySavedAddress(picked);
+                  }}
+                />
+              )}
+              {addressPrefillNote && (
+                <p className="text-xs text-[var(--hb-ink)]/55">
+                  {addressPrefillNote}
+                </p>
+              )}
               <label className="block text-sm font-medium">
                 Address
                 <input
@@ -673,8 +721,6 @@ function CheckoutWizard() {
                   required
                 />
               </label>
-            )}
-            {mode !== 'pickup' && (
               <label className="block text-sm font-medium">
                 Eircode
                 <input
@@ -688,17 +734,13 @@ function CheckoutWizard() {
                   required
                 />
               </label>
-            )}
-            {mode !== 'pickup' && (
               <p className="text-xs text-[var(--hb-ink)]/55">
-                Delivery fee{' '}
-                {deliveryConfig ? formatEuroFee(deliveryFee) : 'shown at confirm'}
+                Fees shown for your basket
                 {deliveryConfig &&
-                (deliveryConfig.freeDeliveryOverAmount ?? 0) > 0 &&
-                deliveryFee > 0
-                  ? ` · free over €${Number(deliveryConfig.freeDeliveryOverAmount).toFixed(2)}`
-                  : ''}{' '}
-                · See{' '}
+                (deliveryConfig.freeDeliveryOverAmount ?? 0) > 0
+                  ? ` (free over ${formatMoney(Number(deliveryConfig.freeDeliveryOverAmount))})`
+                  : ''}
+                . See{' '}
                 <Link to="/delivery-charges" className="underline">
                   Delivery charges
                 </Link>{' '}
@@ -708,126 +750,123 @@ function CheckoutWizard() {
                 </Link>
                 .
               </p>
-            )}
-          </div>
-        )}
+            </div>
+          )}
 
-        {step === 3 && (
-          <div className="space-y-2 text-sm">
-            <p className="font-medium">Confirm & place order</p>
-            <p>
-              Mode: <strong>{mode.replaceAll('_', ' ')}</strong>
-            </p>
-            <p>Items: {draft.items.length} line(s)</p>
-            <p>Area: {area}</p>
-            {mode !== 'pickup' && (
+          {step === LAST_STEP && (
+            <div className="space-y-2 text-sm">
+              <p className="font-medium">Confirm & place order</p>
+              <p>
+                Delivery to <strong>{area}</strong>
+              </p>
+              <p>
+                {itemCount} item{itemCount === 1 ? '' : 's'}
+              </p>
               <p>
                 Address: {address}, {normalizeEircode(eircode)}
               </p>
-            )}
-            {mode === 'scheduled_delivery' && nextDelivery && (
-              <p>
-                Delivery day:{' '}
-                {new Date(nextDelivery.deliveryDate).toLocaleDateString()}
-              </p>
-            )}
-            {mode === 'realtime_delivery' && (
-              <p>
-                ETA window: about {features?.realtimeEtaMinutes ?? 60} minutes
-                (confirmed after place)
-              </p>
-            )}
-            {mode === 'pickup' && (
-              <p>Pickup from Halal Basket in {area}</p>
-            )}
-            {previewLoading && (
-              <p className="text-sm text-[var(--hb-ink)]/55">
-                Checking availability…
-              </p>
-            )}
-            {!previewLoading && previewOk === false && (
-              <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
-                <p className="font-medium">
-                  {previewMessage ||
-                    'Some items are unavailable in this area'}
-                </p>
-                {unavailableNames.length > 0 && (
-                  <ul className="mt-1 list-disc pl-5">
-                    {unavailableNames.map((name) => (
-                      <li key={name}>{name}</li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            )}
-            {!previewLoading && previewOk === true && (
-              <p className="text-sm text-[var(--hb-green)]">
-                All items available for this area
-                {holdExpiresAt
-                  ? ` · stock held until ${new Date(holdExpiresAt).toLocaleTimeString()}`
-                  : ''}
-              </p>
-            )}
-            <div className="mt-3 space-y-1 rounded-lg bg-[var(--hb-mist)]/70 px-3 py-3">
-              <p className="flex justify-between">
-                <span>Subtotal</span>
-                <span>€{itemsSubtotal.toFixed(2)}</span>
-              </p>
-              {couponDiscount > 0 && appliedCoupon && (
-                <p className="flex justify-between text-[var(--hb-green)]">
-                  <span>Coupon ({appliedCoupon})</span>
-                  <span>−€{couponDiscount.toFixed(2)}</span>
+              {nextDelivery && (
+                <p>
+                  Delivery day:{' '}
+                  {new Date(nextDelivery.deliveryDate).toLocaleDateString(
+                    undefined,
+                    {
+                      weekday: 'long',
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                    },
+                  )}
                 </p>
               )}
-              <p className="flex justify-between">
-                <span>{mode === 'pickup' ? 'Pickup fee' : 'Delivery fee'}</span>
-                <span>
-                  {deliveryFee === 0 ? 'Free' : `€${deliveryFee.toFixed(2)}`}
-                </span>
-              </p>
-              <p className="flex justify-between font-semibold">
-                <span>Total</span>
-                <span>€{estimatedTotal.toFixed(2)}</span>
-              </p>
+              {previewLoading && (
+                <p className="text-sm text-[var(--hb-ink)]/55">
+                  Checking availability…
+                </p>
+              )}
+              {!previewLoading && previewOk === false && (
+                <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
+                  <p className="font-medium">
+                    {previewMessage ||
+                      'Some items are unavailable in this area'}
+                  </p>
+                  {unavailableNames.length > 0 && (
+                    <ul className="mt-1 list-disc pl-5">
+                      {unavailableNames.map((name) => (
+                        <li key={name}>{name}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+              {!previewLoading && previewOk === true && (
+                <p className="text-sm text-[var(--hb-green)]">
+                  All items available for this area
+                  {holdExpiresAt
+                    ? ` · reserved until ${new Date(holdExpiresAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`
+                    : ''}
+                </p>
+              )}
+              <div className="mt-3 space-y-1 rounded-lg bg-[var(--hb-mist)]/70 px-3 py-3">
+                <p className="flex justify-between">
+                  <span>Subtotal</span>
+                  <span>{formatMoney(itemsSubtotal)}</span>
+                </p>
+                {couponDiscount > 0 && appliedCoupon && (
+                  <p className="flex justify-between text-[var(--hb-green)]">
+                    <span>Coupon ({appliedCoupon})</span>
+                    <span>−{formatMoney(couponDiscount)}</span>
+                  </p>
+                )}
+                <p className="flex justify-between">
+                  <span>Delivery fee</span>
+                  <span>
+                    {deliveryFee === 0 ? 'Free' : formatMoney(deliveryFee)}
+                  </span>
+                </p>
+                <p className="flex justify-between font-semibold">
+                  <span>Total</span>
+                  <span>{formatMoney(estimatedTotal)}</span>
+                </p>
+              </div>
             </div>
-          </div>
-        )}
-
-        {error && (
-          <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
-            {error}
-          </p>
-        )}
-
-        <div className="flex gap-2">
-          {step > 0 && (
-            <button
-              type="button"
-              className="hb-btn hb-btn-ghost flex-1"
-              onClick={() => setStep((s) => s - 1)}
-            >
-              Back
-            </button>
           )}
-          <button
-            disabled={
-              loading ||
-              !canNext() ||
-              (step === 1 && mode !== 'pickup' && areas.length === 0) ||
-              (step === 3 &&
-                (previewLoading || previewOk !== true || !holdId))
-            }
-            className="hb-btn hb-btn-primary flex-1 py-3"
-          >
-            {step === 3
-              ? loading
-                ? 'Placing…'
-                : 'Place order'
-              : 'Continue'}
-          </button>
-        </div>
-      </form>
-    </main>
+
+          {error && (
+            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
+              {error}
+            </p>
+          )}
+
+          <div className="flex gap-2">
+            {step > 0 && (
+              <button
+                type="button"
+                className="hb-btn hb-btn-ghost flex-1"
+                onClick={() => setStep((s) => s - 1)}
+              >
+                Back
+              </button>
+            )}
+            <button
+              disabled={
+                loading ||
+                !canNext() ||
+                (step === 1 && areas.length === 0) ||
+                (step === LAST_STEP &&
+                  (previewLoading || previewOk !== true || !holdId))
+              }
+              className="hb-btn hb-btn-primary flex-1 py-3"
+            >
+              {step === LAST_STEP
+                ? loading
+                  ? 'Placing…'
+                  : 'Place order'
+                : 'Continue'}
+            </button>
+          </div>
+        </form>
+      </main>
       <SiteFooter />
     </div>
   );

@@ -3,6 +3,9 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   ICON_SIZES,
   IconButton,
+  formatOrderStatus,
+  formatPaymentStatus,
+  StatusBadge,
   Tooltip,
   UtilityIcons,
   toastError,
@@ -12,6 +15,7 @@ import {
   useToastStore,
 } from '@halal-basket/web';
 import { useAuth } from '../../auth/AuthContext';
+import { useLocale } from '../../locale/LocaleContext';
 import { api } from '../../lib/api';
 import { loadOrderIntoCart } from '../../lib/reorder';
 
@@ -43,6 +47,7 @@ const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
 
 export function OrdersPage() {
   const { session } = useAuth();
+  const { formatMoney } = useLocale();
   const { id } = useParams();
   const navigate = useNavigate();
   const toast = useToastStore((s) => s.toast);
@@ -149,9 +154,10 @@ export function OrdersPage() {
             </p>
             <p className="font-mono text-xs">{id}</p>
             <p>
-              Order: <strong>{live?.status ?? order?.status}</strong>
+              Order:{' '}
+              <strong>{formatOrderStatus(live?.status ?? order?.status ?? '')}</strong>
               {live?.paymentStatus
-                ? ` · Payment ${live.paymentStatus}`
+                ? ` · Payment ${formatPaymentStatus(live.paymentStatus)}`
                 : ''}
             </p>
             <p>Mode: {fulfillmentMode?.replaceAll('_', ' ')}</p>
@@ -166,12 +172,12 @@ export function OrdersPage() {
                 {Number(order.discountAmount ?? 0) > 0 && (
                   <p className="text-sm text-[var(--hb-green)]">
                     Discount
-                    {order.couponCode ? ` (${order.couponCode})` : ''}: −€
-                    {Number(order.discountAmount).toFixed(2)}
+                    {order.couponCode ? ` (${order.couponCode})` : ''}: −
+                    {formatMoney(Number(order.discountAmount))}
                   </p>
                 )}
                 <p className="font-display text-2xl">
-                  €{Number(order.totalAmount).toFixed(2)}
+                  {formatMoney(Number(order.totalAmount))}
                 </p>
               </>
             )}
@@ -188,7 +194,7 @@ export function OrdersPage() {
                     {fulfillments.length > 1
                       ? `Part ${f.part ?? index + 1} of ${f.partsTotal ?? fulfillments.length}`
                       : 'Halal Basket'}{' '}
-                    · <strong>{f.status.replaceAll('_', ' ')}</strong>
+                    · <StatusBadge status={f.status} />
                   </p>
                   {fulfillmentMode === 'pickup' && f.shopAddress && (
                     <p className="text-[var(--hb-ink)]/65">
@@ -264,14 +270,14 @@ export function OrdersPage() {
                 {pageRows.map((o) => (
                   <tr key={o.id}>
                     <td className="font-mono text-xs">{o.id.slice(0, 8)}…</td>
-                    <td className="font-semibold">{o.status}</td>
+                    <td className="font-semibold">{formatOrderStatus(o.status)}</td>
                     <td className="text-[var(--hb-ink)]/65">
                       {o.fulfillmentMode.replaceAll('_', ' ')}
                       {o.fulfillments.length > 1
                         ? ` · ${o.fulfillments.length} parts`
                         : ''}
                     </td>
-                    <td>€{Number(o.totalAmount).toFixed(2)}</td>
+                    <td>{formatMoney(Number(o.totalAmount))}</td>
                     <td>
                       <div className="hb-data-table__actions">
                         <button

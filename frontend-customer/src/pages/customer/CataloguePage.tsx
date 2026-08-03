@@ -15,6 +15,8 @@ import {
   useDeliveryCalendarQuery,
   usePlatformCatalogueQuery,
   useToastStore,
+  toastError,
+  toastSuccess,
 } from '@halal-basket/web';
 import { AppHeader } from '../../components/layout/AppHeader';
 import { AppFooter } from '../../components/layout/AppFooter';
@@ -27,10 +29,12 @@ import { CartDrawer } from '../../components/catalogue/CartDrawer';
 import { FiltersPanel } from '../../components/catalogue/FiltersPanel';
 import { useLocale } from '../../locale/LocaleContext';
 import { api } from '../../lib/api';
+import { useFavourites } from '../../hooks/useFavourites';
 
 export function CataloguePage() {
   const { formatMoney } = useLocale();
   const toast = useToastStore((s) => s.toast);
+  const fav = useFavourites();
 
   const search = useCatalogueStore((s) => s.search);
   const browsePath = useCatalogueStore((s) => s.browsePath);
@@ -86,6 +90,15 @@ export function CataloguePage() {
       days: days.join(', '),
     }));
   }, [calendarQuery.data]);
+
+  const selectedAreaDays = useMemo(() => {
+    if (!area) return null;
+    const needle = area.trim().toLowerCase();
+    const match = areaSummary.find(
+      (a) => a.name.trim().toLowerCase() === needle,
+    );
+    return match?.days ?? null;
+  }, [area, areaSummary]);
 
   const breadcrumbs = useMemo(() => {
     return browsePath
@@ -182,6 +195,23 @@ export function CataloguePage() {
         formatMoney={formatMoney}
         onAdd={() => handleAdd(p)}
         onDec={() => setQty(p.productId, qty - 1)}
+        favourited={fav.enabled ? fav.isFavourite(p.productId) : undefined}
+        onToggleFavourite={
+          fav.enabled
+            ? () => {
+                const was = fav.isFavourite(p.productId);
+                void fav.toggle(p.productId).then(
+                  () =>
+                    toastSuccess(
+                      was
+                        ? 'Removed from favourites'
+                        : 'Saved to favourites',
+                    ),
+                  (err: Error) => toastError(err.message),
+                );
+              }
+            : undefined
+        }
       />
     );
   }
@@ -196,7 +226,7 @@ export function CataloguePage() {
         <div className="hb-catalogue-main">
           {isHome && (
             <>
-              <CatalogueHero areaSummary={areaSummary} />
+              <CatalogueHero selectedAreaDays={selectedAreaDays} />
               <PopularCategories />
             </>
           )}

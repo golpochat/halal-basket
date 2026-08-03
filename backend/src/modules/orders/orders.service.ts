@@ -80,10 +80,13 @@ export class OrdersService {
     let discountAmount = new Prisma.Decimal(0);
     let appliedCoupon: string | null = null;
     if (dto.couponCode?.trim()) {
-      const validated = await this.platform.validateCoupon({
-        code: dto.couponCode,
-        subtotal: Number(subtotalAmount.toString()),
-      });
+      const validated = await this.platform.validateCoupon(
+        {
+          code: dto.couponCode,
+          subtotal: Number(subtotalAmount.toString()),
+        },
+        { customerId: customer.id },
+      );
       if (!validated.ok) {
         throw new BadRequestException(validated.message);
       }

@@ -63,7 +63,7 @@ export class PaymentsService {
 
       const session = await stripe.checkout.sessions.create({
         mode: 'payment',
-        success_url: `${base}/orders/${order.id}/confirmation?paid=1`,
+        success_url: `${base}/orders/${order.id}/confirmation?paid=1&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${base}/orders/${order.id}/confirmation?paid=0`,
         line_items: [
           {
@@ -126,7 +126,7 @@ export class PaymentsService {
     };
   }
 
-  /** Mock confirm — never use in production; Stripe uses webhooks. */
+  /** Mock confirm — never use in production; Stripe uses webhooks + return sync. */
   async confirmMock(orderId: string, actorUserId: string, paymentIntentId: string) {
     if (this.provider() !== 'mock') {
       throw new BadRequestException('Mock confirm only when PAYMENT_PROVIDER=mock');
@@ -134,6 +134,64 @@ export class PaymentsService {
     return this.markPaid(orderId, actorUserId, {
       provider: 'mock',
       paymentIntentId,
+    });
+  }
+
+  /**
+   * After Checkout redirect (`?paid=1`), verify the session with Stripe and mark paid.
+   * Complements webhooks so local/dev still works without `stripe listen`.
+   */
+  async confirmStripeReturn(
+    orderId: string,
+    actorUserId: string,
+    sessionId?: string,
+  ) {
+    if (this.provider() !== 'stripe') {
+      throw new BadRequestException('Stripe confirm only when PAYMENT_PROVIDER=stripe');
+    }
+    const key = this.config.get<string>('STRIPE_SECRET_KEY');
+    if (!key) {
+      throw new BadRequestException('STRIPE_SECRET_KEY not configured');
+    }
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Stripe = require('stripe');
+    const stripe = new Stripe(key);
+
+    type SessionLike = {
+      id: string;
+      payment_status?: string | null;
+      status?: string | null;
+      payment_intent?: string | null;
+      metadata?: { orderId?: string } | null;
+    };
+
+    let session: SessionLike | undefined;
+    if (sessionId) {
+      session = (await stripe.checkout.sessions.retrieve(
+        sessionId,
+      )) as SessionLike;
+    } else {
+      const listed = await stripe.checkout.sessions.list({ limit: 40 });
+      session = (listed.data as SessionLike[]).find(
+        (s) =>
+          s.metadata?.orderId === orderId &&
+          (s.payment_status === 'paid' || s.status === 'complete'),
+      );
+    }
+
+    if (!session) {
+      throw new BadRequestException('No matching Stripe Checkout session found');
+    }
+    if (session.metadata?.orderId !== orderId) {
+      throw new BadRequestException('Checkout session does not match this order');
+    }
+    if (session.payment_status !== 'paid' && session.status !== 'complete') {
+      throw new BadRequestException('Stripe payment is not completed yet');
+    }
+
+    return this.markPaid(orderId, actorUserId, {
+      provider: 'stripe',
+      paymentIntentId: String(session.payment_intent ?? session.id),
     });
   }
 

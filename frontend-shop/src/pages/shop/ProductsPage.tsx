@@ -12,10 +12,19 @@ import { api } from '../../lib/api';
 type ShopProduct = {
   id: string;
   price: string | number;
+  discountPrice: string | number | null;
   isInStock: boolean;
   stockQuantity: number;
   isVisible: boolean;
   product: { name: string; barcode: string };
+};
+
+type Draft = {
+  price: string;
+  discountPrice: string;
+  qty: string;
+  inStock: boolean;
+  isVisible: boolean;
 };
 
 const PAGE_SIZE = 10;
@@ -25,9 +34,7 @@ export function ShopProductsPage() {
   const token = session!.accessToken;
   const [products, setProducts] = useState<ShopProduct[]>([]);
   const [page, setPage] = useState(1);
-  const [drafts, setDrafts] = useState<
-    Record<string, { price: string; qty: string; inStock: boolean }>
-  >({});
+  const [drafts, setDrafts] = useState<Record<string, Draft>>({});
 
   async function refresh() {
     const list = await api<ShopProduct[]>('/shop-portal/products', { token });
@@ -38,8 +45,11 @@ export function ShopProductsPage() {
         if (!next[sp.id]) {
           next[sp.id] = {
             price: String(sp.price),
+            discountPrice:
+              sp.discountPrice == null ? '' : String(sp.discountPrice),
             qty: String(sp.stockQuantity ?? 0),
             inStock: sp.isInStock,
+            isVisible: sp.isVisible,
           };
         }
       }
@@ -62,10 +72,7 @@ export function ShopProductsPage() {
     if (page > totalPages) setPage(totalPages);
   }, [page, totalPages]);
 
-  function updateDraft(
-    id: string,
-    patch: Partial<{ price: string; qty: string; inStock: boolean }>,
-  ) {
+  function updateDraft(id: string, patch: Partial<Draft>) {
     setDrafts((prev) => ({
       ...prev,
       [id]: { ...prev[id], ...patch },
@@ -75,15 +82,24 @@ export function ShopProductsPage() {
   async function save(sp: ShopProduct) {
     const draft = drafts[sp.id];
     if (!draft) return;
+    const discountRaw = draft.discountPrice.trim();
     try {
       await api(`/shop-portal/products/${sp.id}`, {
         method: 'PATCH',
         token,
         body: JSON.stringify({
           price: Number(draft.price),
+          discountPrice:
+            discountRaw === '' ? null : Number(discountRaw),
           stockQuantity: Math.max(0, Math.floor(Number(draft.qty) || 0)),
           isInStock: draft.inStock,
+          isVisible: draft.isVisible,
         }),
+      });
+      setDrafts((prev) => {
+        const next = { ...prev };
+        delete next[sp.id];
+        return next;
       });
       await refresh();
       toastSuccess('Product saved');
@@ -96,9 +112,9 @@ export function ShopProductsPage() {
     <div>
       <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
         <p className="text-sm text-[var(--hb-ink)]/55">
-          Stock quantity drives soft holds at checkout. Set to 0 (or uncheck in
-          stock) to stop selling. · {products.length} total · {PAGE_SIZE} per
-          page
+          Stock quantity drives soft holds at checkout. Hide removes the product
+          from the customer catalogue without deleting it. · {products.length}{' '}
+          total · {PAGE_SIZE} per page
         </p>
         <IconButton
           label="Refresh products"
@@ -117,9 +133,11 @@ export function ShopProductsPage() {
             <tr>
               <th>Product</th>
               <th>Barcode</th>
-              <th>Price (€)</th>
+              <th>Price</th>
+              <th>Discount</th>
               <th>Qty</th>
               <th>In stock</th>
+              <th>Visible</th>
               <th style={{ textAlign: 'right' }}>Actions</th>
             </tr>
           </thead>
@@ -127,8 +145,11 @@ export function ShopProductsPage() {
             {pageRows.map((sp) => {
               const draft = drafts[sp.id] ?? {
                 price: String(sp.price),
+                discountPrice:
+                  sp.discountPrice == null ? '' : String(sp.discountPrice),
                 qty: String(sp.stockQuantity ?? 0),
                 inStock: sp.isInStock,
+                isVisible: sp.isVisible,
               };
               return (
                 <tr key={sp.id}>
@@ -144,6 +165,17 @@ export function ShopProductsPage() {
                         updateDraft(sp.id, { price: e.target.value })
                       }
                       aria-label={`Price for ${sp.product.name}`}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      className="hb-input w-24 py-1.5 text-sm"
+                      value={draft.discountPrice}
+                      placeholder="—"
+                      onChange={(e) =>
+                        updateDraft(sp.id, { discountPrice: e.target.value })
+                      }
+                      aria-label={`Discount price for ${sp.product.name}`}
                     />
                   </td>
                   <td>
@@ -183,6 +215,16 @@ export function ShopProductsPage() {
                     />
                   </td>
                   <td>
+                    <input
+                      type="checkbox"
+                      checked={draft.isVisible}
+                      onChange={(e) =>
+                        updateDraft(sp.id, { isVisible: e.target.checked })
+                      }
+                      aria-label={`Visible for ${sp.product.name}`}
+                    />
+                  </td>
+                  <td>
                     <div className="hb-data-table__actions">
                       <button
                         type="button"
@@ -198,7 +240,7 @@ export function ShopProductsPage() {
             })}
             {pageRows.length === 0 && (
               <tr>
-                <td colSpan={6} className="text-[var(--hb-ink)]/55">
+                <td colSpan={8} className="text-[var(--hb-ink)]/55">
                   No products yet.
                 </td>
               </tr>

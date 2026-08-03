@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react';
 import { HalalBadge, PartnerBadge } from './Badge';
 import { Button } from './Button';
+import { IconButton } from './IconButton';
 import { ProductImage } from './ProductImage';
-import { StockDotIcon } from '../../../icons';
+import { ICON_SIZES, StockDotIcon, UtilityIcons } from '../../../icons';
 import type { StockLevel } from '../types';
 
 export type ProductCardData = {
@@ -45,6 +46,30 @@ function StockStatus({ stock }: { stock: StockLevel }) {
   );
 }
 
+function FavouriteControl({
+  favourited,
+  onToggleFavourite,
+}: {
+  favourited: boolean;
+  onToggleFavourite: () => void;
+}) {
+  return (
+    <IconButton
+      label={favourited ? 'Remove from favourites' : 'Save to favourites'}
+      className="hb-product-card__fav"
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onToggleFavourite();
+      }}
+    >
+      {favourited
+        ? UtilityIcons.heartFilled({ size: ICON_SIZES.sm })
+        : UtilityIcons.heart({ size: ICON_SIZES.sm })}
+    </IconButton>
+  );
+}
+
 export function ProductCard({
   product,
   qty,
@@ -52,6 +77,8 @@ export function ProductCard({
   onDec,
   formatMoney,
   layout = 'grid',
+  favourited,
+  onToggleFavourite,
 }: {
   product: ProductCardData;
   qty: number;
@@ -59,9 +86,12 @@ export function ProductCard({
   onDec: () => void;
   formatMoney: (n: number) => string;
   layout?: 'grid' | 'list';
+  favourited?: boolean;
+  onToggleFavourite?: () => void;
 }) {
   const outOfStock = product.stock === 'out_of_stock';
   const canAdd = !outOfStock;
+  const showFav = typeof onToggleFavourite === 'function';
 
   const oosLabel = outOfStock ? (
     <div className="hb-product-card__oos-label" aria-hidden>
@@ -82,6 +112,14 @@ export function ProductCard({
         <div className="hb-product-card__media relative h-24 w-24 shrink-0 overflow-hidden rounded-[var(--hb-radius)] sm:h-28 sm:w-28">
           <ProductImage src={product.imageUrl} alt={product.name} size="sm" />
           {oosLabel}
+          {showFav ? (
+            <div className="hb-product-card__fav-wrap">
+              <FavouriteControl
+                favourited={Boolean(favourited)}
+                onToggleFavourite={onToggleFavourite!}
+              />
+            </div>
+          ) : null}
         </div>
         <div className="flex min-w-0 flex-1 flex-col sm:flex-row sm:items-center sm:justify-between sm:gap-4">
           <div className="min-w-0">
@@ -147,6 +185,14 @@ export function ProductCard({
           {product.verifiedHalal && <HalalBadge />}
           {product.shopPartner && <PartnerBadge />}
         </div>
+        {showFav ? (
+          <div className="hb-product-card__fav-wrap">
+            <FavouriteControl
+              favourited={Boolean(favourited)}
+              onToggleFavourite={onToggleFavourite!}
+            />
+          </div>
+        ) : null}
       </div>
 
       <div className="flex flex-1 flex-col gap-1 p-3 sm:p-4">

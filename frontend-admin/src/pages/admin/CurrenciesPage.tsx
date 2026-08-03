@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { RequireAuth, RequireRole } from '../../auth/guards';
+import { RequireAuth, RequirePermission } from '../../auth/guards';
 import { useAuth } from '../../auth/AuthContext';
 import { api } from '../../lib/api';
 import { Flash } from './Flash';
@@ -8,9 +8,9 @@ import type { CurrencyRow } from './types';
 export function AdminCurrenciesPage() {
   return (
     <RequireAuth>
-      <RequireRole roles={['super_admin']}>
+      <RequirePermission permissions={['currencies.read']}>
         <CurrenciesInner />
-      </RequireRole>
+      </RequirePermission>
     </RequireAuth>
   );
 }
@@ -18,6 +18,9 @@ export function AdminCurrenciesPage() {
 function CurrenciesInner() {
   const { session } = useAuth();
   const token = session!.accessToken;
+  const isSuper = session!.user.role === 'super_admin';
+  const canWrite =
+    isSuper || (session!.permissions ?? []).includes('currencies.write');
   const [error, setError] = useState('');
   const [msg, setMsg] = useState('');
   const [currencies, setCurrencies] = useState<CurrencyRow[]>([]);
@@ -88,7 +91,8 @@ function CurrenciesInner() {
                   {c.isDefault ? ' · default' : ''}
                   {c.isPublished ? ' · published' : ' · unpublished'}
                 </span>
-                <span className="flex flex-wrap gap-1">
+                {canWrite ? (
+                  <span className="flex flex-wrap gap-1">
                   <button
                     type="button"
                     className="hb-btn hb-btn-ghost px-2 py-1 text-xs"
@@ -162,43 +166,46 @@ function CurrenciesInner() {
                       Delete
                     </button>
                   )}
-                </span>
+                  </span>
+                ) : null}
               </li>
             ))}
           </ul>
-          <form onSubmit={addCurrency} className="mt-4 grid gap-2 sm:grid-cols-4">
-            <input
-              className="hb-input"
-              placeholder="Code (GBP)"
-              value={curCode}
-              onChange={(e) => setCurCode(e.target.value)}
-              required
-            />
-            <input
-              className="hb-input"
-              placeholder="Symbol (£)"
-              value={curSymbol}
-              onChange={(e) => setCurSymbol(e.target.value)}
-              required
-            />
-            <input
-              className="hb-input"
-              placeholder="Name"
-              value={curName}
-              onChange={(e) => setCurName(e.target.value)}
-              required
-            />
-            <input
-              className="hb-input"
-              placeholder="Rate vs default"
-              value={curRate}
-              onChange={(e) => setCurRate(e.target.value)}
-              required
-            />
-            <button className="hb-btn hb-btn-primary sm:col-span-4">
-              Add currency
-            </button>
-          </form>
+          {canWrite ? (
+            <form onSubmit={addCurrency} className="mt-4 grid gap-2 sm:grid-cols-4">
+              <input
+                className="hb-input"
+                placeholder="Code (GBP)"
+                value={curCode}
+                onChange={(e) => setCurCode(e.target.value)}
+                required
+              />
+              <input
+                className="hb-input"
+                placeholder="Symbol (£)"
+                value={curSymbol}
+                onChange={(e) => setCurSymbol(e.target.value)}
+                required
+              />
+              <input
+                className="hb-input"
+                placeholder="Name"
+                value={curName}
+                onChange={(e) => setCurName(e.target.value)}
+                required
+              />
+              <input
+                className="hb-input"
+                placeholder="Rate vs default"
+                value={curRate}
+                onChange={(e) => setCurRate(e.target.value)}
+                required
+              />
+              <button className="hb-btn hb-btn-primary sm:col-span-4">
+                Add currency
+              </button>
+            </form>
+          ) : null}
         </section>
       </div>
     </>

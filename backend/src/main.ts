@@ -99,7 +99,12 @@ async function bootstrap() {
   app.useBodyParser('json', { limit: '1mb' });
   app.useBodyParser('urlencoded', { limit: '1mb', extended: true });
 
-  app.use(helmet());
+  app.use(helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  }));
+
+  const uploadsRoot = join(process.cwd(), 'uploads');
+  app.useStaticAssets(uploadsRoot, { prefix: '/uploads/' });
 
   const origins = (process.env.CORS_ORIGINS ?? '')
     .split(',')

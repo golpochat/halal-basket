@@ -42,9 +42,10 @@ Build each app with `VITE_API_URL` pointing at the API origin; deploy static `di
 VITE_API_URL=https://api.staging.example.com npm run build -w frontend-customer
 VITE_API_URL=https://api.staging.example.com npm run build -w frontend-shop
 VITE_API_URL=https://api.staging.example.com npm run build -w frontend-driver
+VITE_API_URL=https://api.staging.example.com npm run build -w frontend-admin
 ```
 
-Set Staging `CORS_ORIGINS` to the four frontend origins (comma-separated). Set `FRONTEND_URL` to the **customer** origin (Stripe Checkout return URLs).
+Set Staging `CORS_ORIGINS` to the **four** frontend origins (comma-separated). Set `FRONTEND_URL` to the **customer** origin (Stripe Checkout return URLs).
 
 ## Staging cutover checklist
 
@@ -54,7 +55,7 @@ Do this before a real shop UAT. Prefer any host (Railway, Fly, Render, VPS); the
 
 - [ ] Postgres 16+ with a dedicated Staging database (not local Docker volume)
 - [ ] API process with `NODE_ENV=production`, `PORT` as required by host
-- [ ] Three static frontend hosts (or paths) for customer / shop / driver
+- [ ] Three–four static frontend hosts (or paths) for customer / shop / driver / **admin**
 - [ ] Secrets stored in the host secret manager (never commit `.env`)
 
 ### 2. API env (Staging)
@@ -64,7 +65,7 @@ Do this before a real shop UAT. Prefer any host (Railway, Fly, Render, VPS); the
 | `DATABASE_URL` | Staging Postgres URL |
 | `JWT_SECRET` | Long random (≠ local) |
 | `SEED_PASSWORD` | Strong; only if you seed Staging |
-| `CORS_ORIGINS` | Customer + shop + driver HTTPS origins |
+| `CORS_ORIGINS` | Customer + shop + driver + **admin** HTTPS origins |
 | `FRONTEND_URL` | Customer HTTPS origin |
 | `PAYMENT_PROVIDER` | `stripe` |
 | `STRIPE_SECRET_KEY` | `sk_test_…` |
@@ -134,6 +135,8 @@ stripe listen --forward-to localhost:3000/payments/webhook/stripe
 ```
 
 Then repeat payment smoke on `http://localhost:5173`.
+
+After Checkout, success URL calls `POST /payments/orders/:id/confirm-stripe` (verifies the session with Stripe) so the order marks **paid** even without webhooks. Keep webhooks for Staging/Prod reliability.
 
 ## Phase D flags (realtime / multi-shop / live)
 

@@ -20,6 +20,9 @@ import { StockPredictionModule } from './modules/stock-prediction/stock-predicti
 import { PaymentsModule } from './modules/payments/payments.module';
 import { PlatformLocaleModule } from './modules/platform-locale/platform-locale.module';
 import { FeaturedCategoriesModule } from './modules/featured-categories/featured-categories.module';
+import { LegalModule } from './modules/legal/legal.module';
+import { FavouritesModule } from './modules/favourites/favourites.module';
+import { RbacModule } from './modules/rbac/rbac.module';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 import { HttpLoggingInterceptor } from './common/http-logging.interceptor';
 
@@ -53,6 +56,9 @@ import { HttpLoggingInterceptor } from './common/http-logging.interceptor';
     PaymentsModule,
     PlatformLocaleModule,
     FeaturedCategoriesModule,
+    LegalModule,
+    FavouritesModule,
+    RbacModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

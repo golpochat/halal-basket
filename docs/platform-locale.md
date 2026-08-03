@@ -28,7 +28,8 @@ You can add more (e.g. CAD, ga) or delete non-defaults any time from **Platform 
 - **Make default** auto-publishes that option and clears the previous default flag.
 - New rows start **unpublished** so they do not appear in customer pickers until you publish.
 - Shop/order amounts stay in the **default** currency; `exchangeRate` converts for **display** only (units of this currency per 1 default). Stripe remains EUR until multi-currency payments are built.
-- Language switch sets `html lang` + `dir` (RTL for Urdu/Arabic). Full translated UI string packs are a follow-up.
+- Language switch sets `html lang` + `dir` (RTL for Urdu/Arabic). Full translated UI string packs are a follow-up (see [`SYSTEM-COMPLETE.md`](../SYSTEM-COMPLETE.md) § What’s next).
+- Language picker is **hidden on customer/shop/driver storefronts** until packs ship; admin can still CRUD/publish locales.
 
 ## Admin API (super_admin)
 

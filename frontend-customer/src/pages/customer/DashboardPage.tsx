@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
+  formatOrderStatus,
   toastError,
   useCartStore,
   useToastStore,
   type CustomerAddress,
 } from '@halal-basket/web';
 import { useAuth } from '../../auth/AuthContext';
+import { useLocale } from '../../locale/LocaleContext';
 import { api } from '../../lib/api';
 import { loadOrderIntoCart } from '../../lib/reorder';
 
@@ -43,12 +45,9 @@ function defaultAddress(list: CustomerAddress[] | undefined) {
   return list.find((a) => a.isDefault) ?? list[0] ?? null;
 }
 
-function formatMoney(n: string | number) {
-  return `€${Number(n).toFixed(2)}`;
-}
-
 export function CustomerDashboardPage() {
   const { session } = useAuth();
+  const { formatMoney } = useLocale();
   const navigate = useNavigate();
   const toast = useToastStore((s) => s.toast);
   const setCartOpen = useCartStore((s) => s.setCartOpen);
@@ -164,11 +163,11 @@ export function CustomerDashboardPage() {
                               },
                             )
                           : order.id.slice(0, 8)}{' '}
-                        · {formatMoney(order.totalAmount)}
+                        · {formatMoney(Number(order.totalAmount))}
                       </p>
                       <p className="mt-0.5 text-xs text-[var(--hb-ink)]/55">
                         <span className="font-medium text-[var(--hb-ink)]/70">
-                          {order.status.replaceAll('_', ' ')}
+                          {formatOrderStatus(order.status)}
                         </span>
                         {' · '}
                         {order.fulfillmentMode.replaceAll('_', ' ')}

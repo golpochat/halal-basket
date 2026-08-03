@@ -4,7 +4,10 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { DeliveryCalendarService } from '../delivery-calendar/delivery-calendar.service';
 import { FeatureFlagsService } from '../../common/feature-flags.service';
 import { LatLng, MapsService } from '../maps/maps.service';
-import { WAREHOUSE_PUBLISHED_SETTING_KEY } from '../platform-locale/platform-locale.service';
+import {
+  activeShopsWithPublishedWarehouses,
+  getPublishedWarehouseIds,
+} from '../platform-locale/warehouse-publish';
 import { StockService } from '../stock/stock.service';
 
 export type RouteLineItem = {
@@ -162,12 +165,9 @@ export class RoutingEngineService {
     } else if (area) {
       shops = await this.shopsServingArea(area);
     } else {
-      const warehousePublished = await this.isWarehousePublished();
+      const publishedWarehouseIds = await getPublishedWarehouseIds(this.prisma);
       shops = await this.prisma.shop.findMany({
-        where: {
-          isActive: true,
-          ...(warehousePublished ? {} : { kind: ShopKind.shop }),
-        },
+        where: activeShopsWithPublishedWarehouses(publishedWarehouseIds),
       });
     }
 
@@ -402,12 +402,9 @@ export class RoutingEngineService {
   }
 
   private async shopsServingArea(deliveryAreaName: string) {
-    const warehousePublished = await this.isWarehousePublished();
+    const publishedWarehouseIds = await getPublishedWarehouseIds(this.prisma);
     const shops = await this.prisma.shop.findMany({
-      where: {
-        isActive: true,
-        ...(warehousePublished ? {} : { kind: ShopKind.shop }),
-      },
+      where: activeShopsWithPublishedWarehouses(publishedWarehouseIds),
     });
     const area = deliveryAreaName.trim().toLowerCase();
     return shops.filter((shop) => {
@@ -435,13 +432,6 @@ export class RoutingEngineService {
       preferredShopId,
     );
     return [...orderedWarehouses, ...orderedPartners];
-  }
-
-  private async isWarehousePublished() {
-    const row = await this.prisma.platformSetting.findUnique({
-      where: { key: WAREHOUSE_PUBLISHED_SETTING_KEY },
-    });
-    return row?.value === 'true';
   }
 
   private sortByDistance(

@@ -39,7 +39,10 @@ jobs:
       - run: npm run build -w shared
       - run: npm test -w backend
       - run: npm run build -w backend
-      - run: npm run build -w frontend
+      - run: npm run build -w frontend-customer
+      - run: npm run build -w frontend-shop
+      - run: npm run build -w frontend-driver
+      - run: npm run build -w frontend-admin
       - name: Migrate + seed
         working-directory: backend
         run: |

@@ -103,7 +103,7 @@ export function ShopPrepPage() {
             {pageRows.length === 0 && (
               <tr>
                 <td colSpan={4} className="text-[var(--hb-ink)]/55">
-                  No scheduled fulfillments for this date.
+                  No scheduled orders for this date.
                 </td>
               </tr>
             )}

@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ICON_SIZES, IconButton, UtilityIcons } from '@halal-basket/web';
-import { RequireAuth, RequireRole } from '../../auth/guards';
+import { useSearchParams } from 'react-router-dom';
+import {
+  ICON_SIZES,
+  IconButton,
+  UtilityIcons,
+  formatOrderStatus,
+  formatPaymentStatus,
+} from '@halal-basket/web';
+import { RequireAuth, RequirePermission } from '../../auth/guards';
 import { useAuth } from '../../auth/AuthContext';
 import { api } from '../../lib/api';
 import { Flash } from './Flash';
@@ -11,16 +18,19 @@ const PAGE_SIZE = 10;
 export function AdminOpsPage() {
   return (
     <RequireAuth>
-      <RequireRole roles={['admin', 'super_admin']}>
+      <RequirePermission permissions={['ops.read']}>
         <OpsInner />
-      </RequireRole>
+      </RequirePermission>
     </RequireAuth>
   );
 }
 
 function OpsInner() {
   const { session } = useAuth();
+  const [searchParams] = useSearchParams();
   const token = session!.accessToken;
+  const isSuper = session!.user.role === 'super_admin';
+  const canWrite = isSuper || (session!.permissions ?? []).includes('ops.write');
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [orderId, setOrderId] = useState('');
   const [orderLookup, setOrderLookup] = useState<AdminOrder | null>(null);
@@ -35,6 +45,14 @@ function OpsInner() {
   useEffect(() => {
     refresh().catch((e: Error) => setError(e.message));
   }, [token]);
+
+  const linkedOrderId = searchParams.get('orderId')?.trim() ?? '';
+
+  useEffect(() => {
+    if (!linkedOrderId) return;
+    setOrderId(linkedOrderId);
+    void lookupOrder(linkedOrderId);
+  }, [linkedOrderId, token]);
 
   const totalPages = Math.max(1, Math.ceil(customers.length / PAGE_SIZE));
   const pageSafe = Math.min(page, totalPages);
@@ -56,15 +74,16 @@ function OpsInner() {
     await refresh();
   }
 
-  async function lookupOrder() {
-    if (!orderId.trim()) {
+  async function lookupOrder(orderIdToLookUp = orderId) {
+    const lookupId = orderIdToLookUp.trim();
+    if (!lookupId) {
       setError('Order ID required');
       return;
     }
     setError('');
     setMsg('');
     try {
-      const order = await api<AdminOrder>(`/admin/orders/${orderId.trim()}`, {
+      const order = await api<AdminOrder>(`/admin/orders/${lookupId}`, {
         token,
       });
       setOrderLookup(order);
@@ -128,19 +147,23 @@ function OpsInner() {
           >
             {UtilityIcons.search({ size: ICON_SIZES.sm })}
           </IconButton>
-          <IconButton
-            label="Record refund"
-            onClick={() => void postOrderEvent('refund')}
-          >
-            {UtilityIcons.refresh({ size: ICON_SIZES.sm })}
-          </IconButton>
-          <IconButton
-            label="Record complaint"
-            tone="danger"
-            onClick={() => void postOrderEvent('complaint')}
-          >
-            {UtilityIcons.help({ size: ICON_SIZES.sm })}
-          </IconButton>
+          {canWrite ? (
+            <>
+              <IconButton
+                label="Record refund"
+                onClick={() => void postOrderEvent('refund')}
+              >
+                {UtilityIcons.refresh({ size: ICON_SIZES.sm })}
+              </IconButton>
+              <IconButton
+                label="Record complaint"
+                tone="danger"
+                onClick={() => void postOrderEvent('complaint')}
+              >
+                {UtilityIcons.help({ size: ICON_SIZES.sm })}
+              </IconButton>
+            </>
+          ) : null}
         </div>
 
         {orderLookup && (
@@ -153,8 +176,8 @@ function OpsInner() {
               {orderLookup.customer.user.email}
             </p>
             <p>
-              Status <strong>{orderLookup.status}</strong> · Payment{' '}
-              <strong>{orderLookup.paymentStatus}</strong> ·{' '}
+              Status <strong>{formatOrderStatus(orderLookup.status)}</strong> · Payment{' '}
+              <strong>{formatPaymentStatus(orderLookup.paymentStatus)}</strong> ·{' '}
               {orderLookup.fulfillmentMode.replaceAll('_', ' ')}
               {orderLookup.deliveryAreaName
                 ? ` · ${orderLookup.deliveryAreaName}`
@@ -230,36 +253,38 @@ function OpsInner() {
                     )}
                   </td>
                   <td>
-                    <div className="hb-data-table__actions">
-                      <IconButton
-                        label={`Recalculate risk for ${c.name}`}
-                        tooltip="Recalculate risk"
-                        onClick={async () => {
-                          const r = await api<{ riskScore: number }>(
-                            `/admin/customers/${c.id}/recalculate-risk`,
-                            { method: 'POST', token },
-                          );
-                          setMsg(`Risk recalculated: ${r.riskScore}`);
-                          await refresh();
-                        }}
-                      >
-                        {UtilityIcons.refresh({ size: ICON_SIZES.sm })}
-                      </IconButton>
-                      <IconButton
-                        label={
-                          c.isBlocked
-                            ? `Unblock ${c.name}`
-                            : `Block ${c.name}`
-                        }
-                        tooltip={c.isBlocked ? 'Unblock' : 'Block'}
-                        tone={c.isBlocked ? 'default' : 'danger'}
-                        onClick={() => void toggleBlock(c)}
-                      >
-                        {c.isBlocked
-                          ? UtilityIcons.unlock({ size: ICON_SIZES.sm })
-                          : UtilityIcons.ban({ size: ICON_SIZES.sm })}
-                      </IconButton>
-                    </div>
+                    {canWrite ? (
+                      <div className="hb-data-table__actions">
+                        <IconButton
+                          label={`Recalculate risk for ${c.name}`}
+                          tooltip="Recalculate risk"
+                          onClick={async () => {
+                            const r = await api<{ riskScore: number }>(
+                              `/admin/customers/${c.id}/recalculate-risk`,
+                              { method: 'POST', token },
+                            );
+                            setMsg(`Risk recalculated: ${r.riskScore}`);
+                            await refresh();
+                          }}
+                        >
+                          {UtilityIcons.refresh({ size: ICON_SIZES.sm })}
+                        </IconButton>
+                        <IconButton
+                          label={
+                            c.isBlocked
+                              ? `Unblock ${c.name}`
+                              : `Block ${c.name}`
+                          }
+                          tooltip={c.isBlocked ? 'Unblock' : 'Block'}
+                          tone={c.isBlocked ? 'default' : 'danger'}
+                          onClick={() => void toggleBlock(c)}
+                        >
+                          {c.isBlocked
+                            ? UtilityIcons.unlock({ size: ICON_SIZES.sm })
+                            : UtilityIcons.ban({ size: ICON_SIZES.sm })}
+                        </IconButton>
+                      </div>
+                    ) : null}
                   </td>
                 </tr>
               ))}

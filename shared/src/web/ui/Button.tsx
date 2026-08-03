@@ -33,7 +33,7 @@ export function Button({
   return (
     <button
       type={type}
-      className={`inline-flex items-center justify-center gap-2 rounded-[var(--hb-radius)] font-semibold transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-55 hb-focus-ring ${variantClass[variant]} ${sizeClass[size]} ${className}`}
+      className={`inline-flex cursor-pointer items-center justify-center gap-2 rounded-[var(--hb-radius)] font-semibold transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-55 hb-focus-ring ${variantClass[variant]} ${sizeClass[size]} ${className}`}
       {...props}
     >
       {children}

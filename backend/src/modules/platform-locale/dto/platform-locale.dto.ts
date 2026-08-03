@@ -1,6 +1,8 @@
 import {
   IsArray,
   IsBoolean,
+  IsDateString,
+  IsInt,
   IsNumber,
   IsObject,
   IsOptional,
@@ -9,9 +11,10 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 
 export class CreateCurrencyDto {
   @IsString()
@@ -194,6 +197,46 @@ export class CouponRuleDto {
   @IsOptional()
   @IsBoolean()
   active?: boolean;
+
+  /** ISO-8601 start; omit/null = no start bound. */
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === '' || value === undefined ? null : value,
+  )
+  @ValidateIf((_, v) => v != null)
+  @IsDateString()
+  startsAt?: string | null;
+
+  /** ISO-8601 end; omit/null = no end bound. */
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === '' || value === undefined ? null : value,
+  )
+  @ValidateIf((_, v) => v != null)
+  @IsDateString()
+  endsAt?: string | null;
+
+  /** Total redemptions across all customers; omit/null = unlimited. */
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === '' || value === undefined ? null : value,
+  )
+  @ValidateIf((_, v) => v != null)
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  maxLimit?: number | null;
+
+  /** Redemptions per customer; omit/null = unlimited. */
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === '' || value === undefined ? null : value,
+  )
+  @ValidateIf((_, v) => v != null)
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  maxLimitPerUser?: number | null;
 }
 
 export class UpdatePromotionsDto {
@@ -225,7 +268,105 @@ export class ValidateCouponDto {
   subtotal!: number;
 }
 
-export class UpsertWarehouseDto {
+export class UpdateBrandingDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(2048)
+  heroBackgroundUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  heroTitle?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  heroSubtitle?: string;
+}
+
+export class CreateBrandingItemDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(2048)
+  heroBackgroundUrl?: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(120)
+  heroTitle!: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
+  heroSubtitle!: string;
+
+  @IsOptional()
+  @IsBoolean()
+  setActive?: boolean;
+}
+
+export class UpdateBrandingItemDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(2048)
+  heroBackgroundUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(120)
+  heroTitle?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
+  heroSubtitle?: string;
+}
+
+export class SetActiveBrandingDto {
+  @IsString()
+  @MinLength(1)
+  activeId!: string;
+}
+
+export class CreateWarehouseDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(120)
+  name!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(240)
+  address?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  lat?: number | null;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  lng?: number | null;
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  published?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  deliveryZones?: string[];
+}
+
+export class UpdateWarehouseDto {
   @IsOptional()
   @IsString()
   @MinLength(1)
@@ -252,10 +393,20 @@ export class UpsertWarehouseDto {
   isActive?: boolean;
 
   @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
   deliveryZones?: string[];
 }
+
+/** @deprecated Prefer CreateWarehouseDto / UpdateWarehouseDto */
+export class UpsertWarehouseDto extends UpdateWarehouseDto {}
 
 export class PublishWarehouseDto {
   @IsBoolean()
   published!: boolean;
+}
+
+export class SetWarehouseActiveDto {
+  @IsBoolean()
+  isActive!: boolean;
 }

@@ -3,7 +3,6 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Button,
   TextInput,
-  ToastViewport,
   formatUserFacingError,
   toastError,
 } from '@halal-basket/web';
@@ -101,7 +100,6 @@ function LoginForm() {
           </Button>
         </form>
       </main>
-      <ToastViewport />
     </div>
   );
 }

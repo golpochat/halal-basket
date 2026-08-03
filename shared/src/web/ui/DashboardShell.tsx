@@ -31,6 +31,8 @@ export type DashboardShellProps = {
   homeTo?: string;
   profileTo?: string;
   nav: DashboardNavItem[];
+  /** Optional controls rendered under sidebar nav (e.g. toggles). */
+  sidebarNavExtra?: ReactNode;
   title?: string;
   userLabel?: string | null;
   userRoleLabel?: string | null;
@@ -71,6 +73,7 @@ export function DashboardShell({
   homeTo = '/dashboard',
   profileTo,
   nav,
+  sidebarNavExtra,
   title: titleProp,
   userLabel,
   userRoleLabel,
@@ -203,6 +206,9 @@ export function DashboardShell({
                 </Tooltip>
               );
             })}
+            {sidebarNavExtra ? (
+              <div className="hb-dashboard__sidebar-nav-extra">{sidebarNavExtra}</div>
+            ) : null}
           </nav>
         </aside>
 

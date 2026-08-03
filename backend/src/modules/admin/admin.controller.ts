@@ -2,12 +2,14 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   NotFoundException,
   Param,
   ParseUUIDPipe,
   Patch,
   Post,
+  Put,
   Query,
   Res,
   UploadedFile,
@@ -23,6 +25,8 @@ import * as XLSX from 'xlsx';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { RequirePermissions } from '../../common/decorators/permissions.decorator';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { ProductsService, ProductImportRow } from '../products/products.service';
 import { ShopsService } from '../shops/shops.service';
 import { AdminUsersService } from './admin-users.service';
@@ -30,8 +34,13 @@ import { AdminCustomersService } from './admin-customers.service';
 import { AdminOrderEventsService } from './admin-order-events.service';
 import { AdminAnalyticsService } from './admin-analytics.service';
 import { GdprService } from './gdpr.service';
+import { AdminEntityOverviewService } from './admin-entity-overview.service';
 import { CreateShopDto, UpsertShopProductDto } from '../shops/dto/shop.dto';
-import { CreateAdminUserDto } from './dto/create-user.dto';
+import {
+  CreateAdminUserDto,
+  SetUserActiveDto,
+  UpdateAdminUserDto,
+} from './dto/create-user.dto';
 import { assertBarcodeRequired } from '../products/import-validation';
 import { ComplaintDto, RefundDto } from './dto/admin-events.dto';
 import { IsBoolean, IsOptional, IsString } from 'class-validator';
@@ -58,7 +67,7 @@ const OPS = [UserRole.admin, UserRole.super_admin] as const;
 const PLATFORM = [UserRole.super_admin] as const;
 
 @Controller('admin')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 export class AdminController {
   constructor(
     private readonly products: ProductsService,
@@ -69,18 +78,28 @@ export class AdminController {
     private readonly analytics: AdminAnalyticsService,
     private readonly risk: RiskEngineService,
     private readonly gdpr: GdprService,
+    private readonly overview: AdminEntityOverviewService,
     private readonly metrics: MetricsService,
     private readonly prisma: PrismaService,
   ) {}
 
   @Get('customers')
   @Roles(...OPS)
+  @RequirePermissions('ops.read')
   listCustomers() {
     return this.customers.list();
   }
 
+  @Get('customers/:id/privacy')
+  @Roles(...OPS)
+  @RequirePermissions('gdpr.read')
+  customerPrivacySummary(@Param('id', ParseUUIDPipe) id: string) {
+    return this.gdpr.privacySummary(id);
+  }
+
   @Get('customers/:id/export')
   @Roles(...OPS)
+  @RequirePermissions('gdpr.read')
   exportCustomer(
     @CurrentUser() user: JwtPayloadUser,
     @Param('id', ParseUUIDPipe) id: string,
@@ -89,7 +108,8 @@ export class AdminController {
   }
 
   @Post('customers/:id/erase')
-  @Roles(...PLATFORM)
+  @Roles(...OPS)
+  @RequirePermissions('gdpr.write')
   eraseCustomer(
     @CurrentUser() user: JwtPayloadUser,
     @Param('id', ParseUUIDPipe) id: string,
@@ -99,18 +119,21 @@ export class AdminController {
 
   @Get('metrics')
   @Roles(...PLATFORM)
+  @RequirePermissions('ops.write')
   metricsSnapshot() {
     return this.metrics.snapshot();
   }
 
   @Post('ops/test-alert')
   @Roles(...PLATFORM)
+  @RequirePermissions('ops.write')
   testAlert(@Body() dto: TestAlertDto) {
     return this.metrics.fireTestAlert(dto.reason ?? 'manual-drill');
   }
 
   @Patch('customers/:id/block')
   @Roles(...OPS)
+  @RequirePermissions('ops.write')
   blockCustomer(
     @CurrentUser() user: JwtPayloadUser,
     @Param('id', ParseUUIDPipe) id: string,
@@ -121,6 +144,7 @@ export class AdminController {
 
   @Post('orders/:id/refund')
   @Roles(...OPS)
+  @RequirePermissions('ops.write')
   refund(
     @CurrentUser() user: JwtPayloadUser,
     @Param('id', ParseUUIDPipe) id: string,
@@ -136,6 +160,7 @@ export class AdminController {
 
   @Get('orders/:id')
   @Roles(...OPS)
+  @RequirePermissions('ops.read')
   async getOrder(@Param('id', ParseUUIDPipe) id: string) {
     const order = await this.prisma.order.findUnique({
       where: { id },
@@ -154,6 +179,7 @@ export class AdminController {
 
   @Post('orders/:id/complaint')
   @Roles(...OPS)
+  @RequirePermissions('ops.write')
   complaint(
     @CurrentUser() user: JwtPayloadUser,
     @Param('id', ParseUUIDPipe) id: string,
@@ -164,6 +190,7 @@ export class AdminController {
 
   @Post('customers/:id/recalculate-risk')
   @Roles(...OPS)
+  @RequirePermissions('ops.write')
   recalcRisk(@Param('id', ParseUUIDPipe) id: string) {
     return this.risk.recalculateCustomer(id).then((riskScore) => ({
       customerId: id,
@@ -172,25 +199,43 @@ export class AdminController {
   }
 
   @Get('analytics/summary')
-  @Roles(...PLATFORM)
+  @Roles(...OPS)
+  @RequirePermissions('analytics.read')
   analyticsSummary() {
     return this.analytics.summary();
   }
 
   @Get('shops')
-  @Roles(...PLATFORM)
+  @Roles(...OPS)
+  @RequirePermissions('shops.read')
   listShops() {
     return this.shops.listAll();
   }
 
+  @Get('shops/directory')
+  @Roles(...OPS)
+  @RequirePermissions('shops.read')
+  listPartnerShopsDirectory() {
+    return this.overview.listPartnerShops();
+  }
+
+  @Get('shops/:shopId/overview')
+  @Roles(...OPS)
+  @RequirePermissions('shops.read')
+  shopOverview(@Param('shopId', ParseUUIDPipe) shopId: string) {
+    return this.overview.shopOverview(shopId);
+  }
+
   @Post('shops')
-  @Roles(...PLATFORM)
+  @Roles(...OPS)
+  @RequirePermissions('shops.write')
   createShop(@Body() dto: CreateShopDto) {
     return this.shops.create(dto);
   }
 
   @Post('shops/:shopId/products')
-  @Roles(...PLATFORM)
+  @Roles(...OPS)
+  @RequirePermissions('shops.write')
   upsertShopProduct(
     @Param('shopId', ParseUUIDPipe) shopId: string,
     @Body() dto: UpsertShopProductDto,
@@ -200,6 +245,7 @@ export class AdminController {
 
   @Get('drivers')
   @Roles(...OPS)
+  @RequirePermissions('drivers.read')
   listDrivers() {
     return this.prisma.driver.findMany({
       where: { isActive: true },
@@ -213,8 +259,30 @@ export class AdminController {
     });
   }
 
+  @Get('drivers/directory')
+  @Roles(...OPS)
+  @RequirePermissions('drivers.read')
+  listDriversDirectory() {
+    return this.overview.listDriversDirectory();
+  }
+
+  @Get('drivers/:driverId/overview')
+  @Roles(...OPS)
+  @RequirePermissions('drivers.read')
+  driverOverview(@Param('driverId', ParseUUIDPipe) driverId: string) {
+    return this.overview.driverOverview(driverId);
+  }
+
+  @Get('users')
+  @Roles(...PLATFORM)
+  @RequirePermissions('users.read')
+  listUsers() {
+    return this.users.listUsers();
+  }
+
   @Post('users')
   @Roles(...PLATFORM)
+  @RequirePermissions('users.write')
   createUser(
     @CurrentUser() user: JwtPayloadUser,
     @Body() dto: CreateAdminUserDto,
@@ -222,8 +290,40 @@ export class AdminController {
     return this.users.createUser(dto, user.role as UserRole);
   }
 
-  @Post('products/import')
+  @Patch('users/:id')
   @Roles(...PLATFORM)
+  @RequirePermissions('users.write')
+  updateUser(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateAdminUserDto,
+  ) {
+    return this.users.updateUser(id, dto);
+  }
+
+  @Put('users/:id/active')
+  @Roles(...PLATFORM)
+  @RequirePermissions('users.write')
+  setUserActive(
+    @CurrentUser() user: JwtPayloadUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: SetUserActiveDto,
+  ) {
+    return this.users.setActive(id, dto.isActive, user.userId);
+  }
+
+  @Delete('users/:id')
+  @Roles(...PLATFORM)
+  @RequirePermissions('users.write')
+  deleteUser(
+    @CurrentUser() user: JwtPayloadUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.users.deleteUser(id, user.userId);
+  }
+
+  @Post('products/import')
+  @Roles(...OPS)
+  @RequirePermissions('catalogue.write')
   @UseInterceptors(FileInterceptor('file'))
   async importProducts(
     @UploadedFile() file: Express.Multer.File | undefined,
@@ -262,7 +362,8 @@ export class AdminController {
   }
 
   @Get('products/export')
-  @Roles(...PLATFORM)
+  @Roles(...OPS)
+  @RequirePermissions('catalogue.read')
   async exportProducts(
     @Query('format') format: string | undefined,
     @Res() res: Response,

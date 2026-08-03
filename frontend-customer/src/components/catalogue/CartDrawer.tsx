@@ -129,6 +129,7 @@ export function CartDrawer() {
       code?: string;
     }>('/platform/coupons/validate', {
       method: 'POST',
+      token: session?.accessToken,
       body: JSON.stringify({ code: couponApplied, subtotal }),
     })
       .then((res) => {
@@ -270,6 +271,7 @@ export function CartDrawer() {
         value?: number;
       }>('/platform/coupons/validate', {
         method: 'POST',
+        token: session?.accessToken,
         body: JSON.stringify({ code, subtotal }),
       });
       if (!res.ok || !res.code || res.type == null || res.value == null) {
@@ -295,7 +297,7 @@ export function CartDrawer() {
       {!cartOpen && (
         <button
           type="button"
-          className="hb-cart-tab fixed right-0 top-1/2 z-30 hidden -translate-y-1/2 flex-col items-center gap-2 rounded-l-2xl bg-[var(--hb-green)] px-3 py-4 text-white shadow-[var(--hb-shadow-lg)] transition hover:bg-[var(--hb-green-hover)] sm:flex"
+          className="hb-cart-tab fixed right-0 top-1/2 z-30 hidden -translate-y-1/2 cursor-pointer flex-col items-center gap-2 rounded-l-2xl bg-[var(--hb-green)] px-3 py-4 text-white shadow-[var(--hb-shadow-lg)] transition hover:bg-[var(--hb-green-hover)] sm:flex"
           onClick={() => setCartOpen(true)}
           aria-label={`Open cart, ${count} items, ${formatMoney(total)}`}
         >
@@ -310,7 +312,7 @@ export function CartDrawer() {
       {!cartOpen && (
         <button
           type="button"
-          className="hb-cart-bar fixed bottom-4 left-1/2 z-30 flex -translate-x-1/2 items-center gap-3 rounded-[var(--hb-radius-lg)] bg-[var(--hb-green)] px-4 py-3 text-white shadow-[var(--hb-shadow-lg)] sm:hidden"
+          className="hb-cart-bar fixed bottom-4 left-1/2 z-30 flex -translate-x-1/2 cursor-pointer items-center gap-3 rounded-[var(--hb-radius-lg)] bg-[var(--hb-green)] px-4 py-3 text-white shadow-[var(--hb-shadow-lg)] sm:hidden"
           onClick={() => setCartOpen(true)}
           aria-label={`Open cart, ${count} items, ${formatMoney(total)}`}
         >
@@ -489,7 +491,7 @@ export function CartDrawer() {
                 <div className="mb-3 flex flex-wrap items-center gap-2">
                   <button
                     type="button"
-                    className="flex items-center gap-2 text-left text-sm font-medium text-[var(--hb-ink)]/70 hover:text-[var(--hb-green)] disabled:opacity-45"
+                    className="flex cursor-pointer items-center gap-2 text-left text-sm font-medium text-[var(--hb-ink)]/70 hover:text-[var(--hb-green)] disabled:cursor-not-allowed disabled:opacity-45"
                     onClick={() => setCouponOpen(true)}
                     disabled={count === 0}
                   >
@@ -581,7 +583,7 @@ export function CartDrawer() {
                 type="button"
                 disabled={count === 0 || unavailableIds.length > 0}
                 onClick={goCheckout}
-                className="flex h-12 w-full items-center justify-between gap-3 rounded-[var(--hb-radius)] bg-[var(--hb-green)] px-4 text-white transition hover:bg-[var(--hb-green-hover)] disabled:cursor-not-allowed disabled:opacity-55"
+                className="flex h-12 w-full cursor-pointer items-center justify-between gap-3 rounded-[var(--hb-radius)] bg-[var(--hb-green)] px-4 text-white transition hover:bg-[var(--hb-green-hover)] disabled:cursor-not-allowed disabled:opacity-55"
               >
                 <span className="text-base font-semibold">Checkout</span>
                 <span className="rounded-md bg-[rgba(0,0,0,0.22)] px-3 py-1.5 text-sm font-semibold tabular-nums">

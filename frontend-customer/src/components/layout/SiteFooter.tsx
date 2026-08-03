@@ -1,5 +1,8 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { BrandLogo } from '../brand/BrandLogo';
+import { api } from '../../lib/api';
+import { openCookiePreferences } from '../../lib/cookie-consent';
 import { HB_CHROME_FOOTER_GRID, HB_CHROME_PAD } from './chrome';
 
 const linkClass =
@@ -8,8 +11,17 @@ const linkClass =
 const headingClass =
   'text-xs font-semibold uppercase tracking-wide text-[var(--hb-ink)]/45';
 
+type FooterLegal = { slug: string; title: string; sortOrder: number };
+
 export function SiteFooter() {
   const year = new Date().getFullYear();
+  const [legal, setLegal] = useState<FooterLegal[]>([]);
+
+  useEffect(() => {
+    api<FooterLegal[]>('/platform/legal')
+      .then(setLegal)
+      .catch(() => setLegal([]));
+  }, []);
 
   return (
     <footer className="mt-auto w-full shrink-0 border-t border-[rgba(26,92,58,0.1)] bg-[rgba(247,250,246,0.9)]">
@@ -57,15 +69,36 @@ export function SiteFooter() {
         <div>
           <h2 className={headingClass}>Legal</h2>
           <ul className="mt-3 space-y-1">
+            {legal.length === 0 ? (
+              <>
+                <li>
+                  <Link to="/legal/privacy" className={linkClass}>
+                    Privacy policy
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/legal/terms" className={linkClass}>
+                    Terms of service
+                  </Link>
+                </li>
+              </>
+            ) : (
+              legal.map((d) => (
+                <li key={d.slug}>
+                  <Link to={`/legal/${d.slug}`} className={linkClass}>
+                    {d.title}
+                  </Link>
+                </li>
+              ))
+            )}
             <li>
-              <Link to="/privacy" className={linkClass}>
-                Privacy policy
-              </Link>
-            </li>
-            <li>
-              <Link to="/terms" className={linkClass}>
-                Terms of service
-              </Link>
+              <button
+                type="button"
+                className={`${linkClass} w-full text-left`}
+                onClick={() => openCookiePreferences()}
+              >
+                Cookie preferences
+              </button>
             </li>
           </ul>
         </div>

@@ -39,6 +39,7 @@ export class DriverService {
     } as const;
   }
 
+  /** Open assigned jobs: non-terminal, delivery date today or later (plus undated pickups). */
   async todaysOrders(userId: string, _role: string) {
     const driver = await this.getDriver(userId);
     const today = new Date();
@@ -69,7 +70,7 @@ export class DriverService {
     });
   }
 
-  /** Past assigned jobs: delivered or cancelled (newest delivery date first). */
+  /** Past assigned jobs: delivered, failed attempt, or cancelled. */
   async orderHistory(userId: string, _role: string) {
     const driver = await this.getDriver(userId);
 

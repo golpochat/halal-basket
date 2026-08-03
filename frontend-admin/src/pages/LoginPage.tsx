@@ -3,7 +3,6 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Button,
   TextInput,
-  ToastViewport,
   formatUserFacingError,
   isExternalHome,
   toastError,
@@ -108,7 +107,6 @@ function LoginForm() {
           </Button>
         </form>
       </main>
-      <ToastViewport />
     </div>
   );
 }

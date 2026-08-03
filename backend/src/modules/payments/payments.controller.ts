@@ -12,7 +12,7 @@ import {
 import { UserRole } from '@prisma/client';
 import type { RawBodyRequest } from '@nestjs/common';
 import type { Request } from 'express';
-import { IsString } from 'class-validator';
+import { IsOptional, IsString } from 'class-validator';
 import { PaymentsService } from './payments.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -25,6 +25,12 @@ import {
 class ConfirmMockDto {
   @IsString()
   paymentIntentId!: string;
+}
+
+class ConfirmStripeDto {
+  @IsString()
+  @IsOptional()
+  sessionId?: string;
 }
 
 @Controller('payments')
@@ -56,6 +62,22 @@ export class PaymentsController {
     @Body() dto: ConfirmMockDto,
   ) {
     return this.payments.confirmMock(orderId, user.userId, dto.paymentIntentId);
+  }
+
+  /** After Stripe Checkout success redirect — verifies session and marks paid. */
+  @Post('orders/:orderId/confirm-stripe')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.customer, UserRole.admin, UserRole.super_admin)
+  confirmStripe(
+    @CurrentUser() user: JwtPayloadUser,
+    @Param('orderId', ParseUUIDPipe) orderId: string,
+    @Body() dto: ConfirmStripeDto,
+  ) {
+    return this.payments.confirmStripeReturn(
+      orderId,
+      user.userId,
+      dto.sessionId,
+    );
   }
 
   @Post('webhook/stripe')

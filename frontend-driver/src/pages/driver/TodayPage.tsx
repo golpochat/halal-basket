@@ -39,7 +39,7 @@ export function DriverTodayPage() {
   }
 
   useEffect(() => {
-    refresh().catch((e) => toastError(e, "Could not load today's deliveries"));
+    refresh().catch((e) => toastError(e, 'Could not load open deliveries'));
   }, [session]);
 
   const totalPages = Math.max(1, Math.ceil(orders.length / PAGE_SIZE));
@@ -57,14 +57,15 @@ export function DriverTodayPage() {
     <div>
       <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
         <p className="text-sm text-[var(--hb-ink)]/55">
-          {orders.length} deliveries today · {PAGE_SIZE} per page
+          {orders.length} open deliveries (today and upcoming) · {PAGE_SIZE} per
+          page
         </p>
         <IconButton
           label="Refresh deliveries"
           tooltip="Refresh"
           onClick={() =>
             refresh().catch((e) =>
-              toastError(e, "Could not refresh today's deliveries"),
+              toastError(e, 'Could not refresh open deliveries'),
             )
           }
         >
@@ -116,7 +117,7 @@ export function DriverTodayPage() {
             {pageRows.length === 0 && (
               <tr>
                 <td colSpan={5} className="text-[var(--hb-ink)]/55">
-                  No deliveries assigned for today.
+                  No open deliveries assigned.
                 </td>
               </tr>
             )}

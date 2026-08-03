@@ -1,12 +1,22 @@
-import { Body, Controller, Get, Param, Patch, Put, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Put,
+  UseGuards,
+} from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { RequirePermissions } from '../../common/decorators/permissions.decorator';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { ReplaceFeaturedCategoriesDto } from './dto/featured-categories.dto';
 import { FeaturedCategoriesService } from './featured-categories.service';
 
-const PLATFORM = [UserRole.super_admin] as const;
+const OPS = [UserRole.admin, UserRole.super_admin] as const;
 
 @Controller()
 export class FeaturedCategoriesController {
@@ -18,22 +28,25 @@ export class FeaturedCategoriesController {
   }
 
   @Get('admin/featured-categories')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(...PLATFORM)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @Roles(...OPS)
+  @RequirePermissions('branding.read')
   listAdmin() {
     return this.featured.listAdmin();
   }
 
   @Put('admin/featured-categories')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(...PLATFORM)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @Roles(...OPS)
+  @RequirePermissions('branding.write')
   replaceAll(@Body() dto: ReplaceFeaturedCategoriesDto) {
     return this.featured.replaceAll(dto);
   }
 
   @Patch('admin/featured-categories/:categoryId/active')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(...PLATFORM)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @Roles(...OPS)
+  @RequirePermissions('branding.write')
   setActive(
     @Param('categoryId') categoryId: string,
     @Body() body: { isActive: boolean },

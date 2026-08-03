@@ -177,6 +177,26 @@ function RegisterForm() {
           </p>
         )}
 
+        {step === 2 ? (
+          <p className="text-center text-xs leading-relaxed text-[var(--hb-ink)]/50">
+            By signing up you agree to our{' '}
+            <Link
+              to="/legal/terms"
+              className="font-medium text-[var(--hb-green)] underline"
+            >
+              Terms of service
+            </Link>{' '}
+            and{' '}
+            <Link
+              to="/legal/privacy"
+              className="font-medium text-[var(--hb-green)] underline"
+            >
+              Privacy policy
+            </Link>
+            .
+          </p>
+        ) : null}
+
         <div className="flex gap-2">
           {step === 2 && (
             <button

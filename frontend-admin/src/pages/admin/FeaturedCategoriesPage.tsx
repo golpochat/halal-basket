@@ -1,5 +1,10 @@
 import { useEffect, useState } from 'react';
-import { RequireAuth, RequireRole } from '../../auth/guards';
+import {
+  ICON_SIZES,
+  IconButton,
+  UtilityIcons,
+} from '@halal-basket/web';
+import { RequireAuth, RequirePermission } from '../../auth/guards';
 import { useAuth } from '../../auth/AuthContext';
 import { api } from '../../lib/api';
 import { Flash } from './Flash';
@@ -8,9 +13,9 @@ import type { FeaturedAdminResponse } from './types';
 export function AdminFeaturedCategoriesPage() {
   return (
     <RequireAuth>
-      <RequireRole roles={['super_admin']}>
+      <RequirePermission permissions={['branding.read']}>
         <FeaturedCategoriesInner />
-      </RequireRole>
+      </RequirePermission>
     </RequireAuth>
   );
 }
@@ -18,6 +23,9 @@ export function AdminFeaturedCategoriesPage() {
 function FeaturedCategoriesInner() {
   const { session } = useAuth();
   const token = session!.accessToken;
+  const isSuper = session!.user.role === 'super_admin';
+  const canWrite =
+    isSuper || (session!.permissions ?? []).includes('branding.write');
   const [error, setError] = useState('');
   const [msg, setMsg] = useState('');
   const [featured, setFeatured] = useState<FeaturedAdminResponse | null>(null);
@@ -31,6 +39,7 @@ function FeaturedCategoriesInner() {
   async function saveFeatured(
     items: Array<{ categoryId: string; sortOrder: number; isActive: boolean }>,
   ) {
+    if (!canWrite) return;
     setError('');
     setMsg('');
     try {
@@ -50,7 +59,9 @@ function FeaturedCategoriesInner() {
 
   return (
     <>
-      <h1 className="font-display text-3xl font-semibold tracking-tight">Popular categories</h1>
+      <h1 className="font-display text-3xl font-semibold tracking-tight">
+        Featured categories
+      </h1>
       <div className="mt-6">
         <Flash error={error} msg={msg} />
 
@@ -59,9 +70,14 @@ function FeaturedCategoriesInner() {
             <h2 className="font-semibold">Popular categories</h2>
             <p className="mt-1 text-sm text-[var(--hb-ink)]/55">
               Shown on the customer homepage and sidebar. Keep between{' '}
-              {featured.minVisible} and {featured.maxVisible} active (soft limits).
-              Order is top → bottom / left → right.
+              {featured.minVisible} and {featured.maxVisible} active (soft
+              limits). Order is top → bottom / left → right.
             </p>
+            {!canWrite ? (
+              <p className="mt-2 text-sm text-[var(--hb-ink)]/50">
+                Read-only — branding.write is required to edit.
+              </p>
+            ) : null}
             <ul className="mt-4 space-y-2">
               {featured.items.map((item, index) => (
                 <li
@@ -76,88 +92,97 @@ function FeaturedCategoriesInner() {
                       {item.isActive ? ' · active' : ' · off'}
                     </span>
                   </span>
-                  <span className="flex flex-wrap gap-1">
-                    <button
-                      type="button"
-                      className="hb-btn hb-btn-ghost px-2 py-1 text-xs"
-                      disabled={index === 0}
-                      aria-label={`Move ${item.name} up`}
-                      onClick={async () => {
-                        const next = featured.items.map((row) => ({ ...row }));
-                        const tmp = next[index - 1];
-                        next[index - 1] = next[index];
-                        next[index] = tmp;
-                        await saveFeatured(
-                          next.map((row, i) => ({
-                            categoryId: row.categoryId,
-                            sortOrder: i,
-                            isActive: row.isActive,
-                          })),
-                        );
-                      }}
-                    >
-                      Up
-                    </button>
-                    <button
-                      type="button"
-                      className="hb-btn hb-btn-ghost px-2 py-1 text-xs"
-                      disabled={index === featured.items.length - 1}
-                      aria-label={`Move ${item.name} down`}
-                      onClick={async () => {
-                        const next = featured.items.map((row) => ({ ...row }));
-                        const tmp = next[index + 1];
-                        next[index + 1] = next[index];
-                        next[index] = tmp;
-                        await saveFeatured(
-                          next.map((row, i) => ({
-                            categoryId: row.categoryId,
-                            sortOrder: i,
-                            isActive: row.isActive,
-                          })),
-                        );
-                      }}
-                    >
-                      Down
-                    </button>
-                    <button
-                      type="button"
-                      className="hb-btn hb-btn-ghost px-2 py-1 text-xs"
-                      onClick={async () => {
-                        setError('');
-                        setMsg('');
-                        try {
-                          const res = await api<FeaturedAdminResponse>(
-                            `/admin/featured-categories/${item.categoryId}/active`,
-                            {
-                              method: 'PATCH',
-                              token,
-                              body: JSON.stringify({ isActive: !item.isActive }),
-                            },
+                  {canWrite ? (
+                    <span className="flex flex-wrap items-center gap-1">
+                      <IconButton
+                        label={`Move ${item.name} up`}
+                        tooltip="Move up"
+                        disabled={index === 0}
+                        onClick={async () => {
+                          const next = featured.items.map((row) => ({ ...row }));
+                          const tmp = next[index - 1];
+                          next[index - 1] = next[index];
+                          next[index] = tmp;
+                          await saveFeatured(
+                            next.map((row, i) => ({
+                              categoryId: row.categoryId,
+                              sortOrder: i,
+                              isActive: row.isActive,
+                            })),
                           );
-                          setFeatured(res);
-                          setMsg(
-                            item.isActive
-                              ? `${item.name} hidden from Popular`
-                              : `${item.name} shown in Popular`,
+                        }}
+                      >
+                        {UtilityIcons.arrowUp({ size: ICON_SIZES.sm })}
+                      </IconButton>
+                      <IconButton
+                        label={`Move ${item.name} down`}
+                        tooltip="Move down"
+                        disabled={index === featured.items.length - 1}
+                        onClick={async () => {
+                          const next = featured.items.map((row) => ({ ...row }));
+                          const tmp = next[index + 1];
+                          next[index + 1] = next[index];
+                          next[index] = tmp;
+                          await saveFeatured(
+                            next.map((row, i) => ({
+                              categoryId: row.categoryId,
+                              sortOrder: i,
+                              isActive: row.isActive,
+                            })),
                           );
-                        } catch (err) {
-                          setError(
-                            err instanceof Error
-                              ? err.message
-                              : 'Failed to update featured category',
-                          );
+                        }}
+                      >
+                        {UtilityIcons.arrowDown({ size: ICON_SIZES.sm })}
+                      </IconButton>
+                      <IconButton
+                        label={
+                          item.isActive
+                            ? `Hide ${item.name} from Popular`
+                            : `Show ${item.name} in Popular`
                         }
-                      }}
-                    >
-                      {item.isActive ? 'Hide' : 'Show'}
-                    </button>
-                  </span>
+                        tooltip={item.isActive ? 'Hide' : 'Show'}
+                        onClick={async () => {
+                          setError('');
+                          setMsg('');
+                          try {
+                            const res = await api<FeaturedAdminResponse>(
+                              `/admin/featured-categories/${item.categoryId}/active`,
+                              {
+                                method: 'PATCH',
+                                token,
+                                body: JSON.stringify({
+                                  isActive: !item.isActive,
+                                }),
+                              },
+                            );
+                            setFeatured(res);
+                            setMsg(
+                              item.isActive
+                                ? `${item.name} hidden from Popular`
+                                : `${item.name} shown in Popular`,
+                            );
+                          } catch (err) {
+                            setError(
+                              err instanceof Error
+                                ? err.message
+                                : 'Failed to update featured category',
+                            );
+                          }
+                        }}
+                      >
+                        {item.isActive
+                          ? UtilityIcons.eyeOff({ size: ICON_SIZES.sm })
+                          : UtilityIcons.eye({ size: ICON_SIZES.sm })}
+                      </IconButton>
+                    </span>
+                  ) : null}
                 </li>
               ))}
             </ul>
-            {featured.available.some(
+            {canWrite &&
+            featured.available.some(
               (a) => !featured.items.some((i) => i.categoryId === a.id),
-            ) && (
+            ) ? (
               <div className="mt-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-[var(--hb-ink)]/45">
                   Add category
@@ -192,7 +217,7 @@ function FeaturedCategoriesInner() {
                     ))}
                 </div>
               </div>
-            )}
+            ) : null}
           </section>
         )}
       </div>

@@ -1,8 +1,7 @@
+import { Link } from 'react-router-dom';
 import {
   SearchInput,
   CalendarDayIcon,
-  LocationPinIcon,
-  TRUST_ITEMS,
   ICON_SIZES,
   useCatalogueStore,
   useBrandingQuery,
@@ -13,24 +12,40 @@ const DEFAULT_BG =
   'url("https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=1600&q=80") center/cover';
 
 function formatDay(raw: string) {
-  const d = raw.trim();
-  return d.charAt(0).toUpperCase() + d.slice(1, 3);
+  const d = raw.trim().toLowerCase();
+  if (!d) return '';
+  return d.charAt(0).toUpperCase() + d.slice(1);
 }
 
 export function CatalogueHero({
-  areaSummary,
+  selectedAreaDays,
 }: {
-  areaSummary: Array<{ name: string; days: string }>;
+  /** Comma-separated delivery days for the selected catalogue area. */
+  selectedAreaDays: string | null;
 }) {
   const search = useCatalogueStore((s) => s.search);
   const setSearch = useCatalogueStore((s) => s.setSearch);
   const area = useCatalogueStore((s) => s.area);
   const branding = useBrandingQuery(api);
   const bgUrl = branding.data?.heroBackgroundUrl;
+  const heroTitle =
+    branding.data?.heroTitle?.trim() ||
+    'Halal groceries delivered or ready for pickup';
+  const heroSubtitle =
+    branding.data?.heroSubtitle?.trim() ||
+    'From trusted local halal shops in Dublin';
 
   const background = bgUrl
     ? `url("${bgUrl}") center/cover`
     : DEFAULT_BG;
+
+  const daysLabel = selectedAreaDays
+    ? selectedAreaDays
+        .split(',')
+        .map((d) => formatDay(d))
+        .filter(Boolean)
+        .join(' · ')
+    : '';
 
   return (
     <section
@@ -41,18 +56,14 @@ export function CatalogueHero({
       <div className="hb-hero-scrim" aria-hidden />
 
       <div className="hb-hero-content px-4 py-12 sm:px-6 sm:py-16 lg:py-20">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/90 drop-shadow-sm">
-          Dublin pilot
-        </p>
         <h1
           id="catalogue-hero-heading"
-          className="mt-3 max-w-3xl font-display text-[2.35rem] font-bold leading-[1.12] tracking-tight text-white drop-shadow-sm sm:text-5xl lg:text-[3.25rem]"
+          className="max-w-3xl font-display text-[clamp(1.85rem,2.2vw+1.2rem,3.25rem)] font-bold leading-[1.12] tracking-tight text-balance text-white drop-shadow-sm"
         >
-          Halal groceries delivered or ready for pickup
+          {heroTitle}
         </h1>
-        <p className="mt-5 max-w-2xl text-base font-normal leading-relaxed text-white/90 sm:text-lg">
-          From trusted local halal shops in Dublin
-          {area ? ` · Serving ${area}` : ''}
+        <p className="mt-5 max-w-3xl text-[clamp(1rem,0.35vw+0.9rem,1.125rem)] font-normal leading-relaxed text-white/90">
+          {heroSubtitle}
         </p>
 
         <div className="mt-8 w-full max-w-3xl">
@@ -70,69 +81,44 @@ export function CatalogueHero({
           />
         </div>
 
-        <ul
-          className="mt-5 flex flex-wrap gap-3 sm:mt-6"
-          aria-label="Trust indicators"
-        >
-          {TRUST_ITEMS.map(({ id, label, Icon }) => (
-            <li key={id}>
-              <span className="hb-trust-chip">
-                <Icon size={ICON_SIZES.md} title={label} />
-                <span>{label}</span>
+        <div className="mt-6 max-w-3xl">
+          {area && daysLabel ? (
+            <div className="hb-calendar-strip">
+              <span
+                className="inline-flex shrink-0 rounded-[10px] bg-white/95 p-1.5 shadow-[var(--hb-icon-shadow)]"
+                aria-hidden
+              >
+                <CalendarDayIcon size={ICON_SIZES.md} />
               </span>
-            </li>
-          ))}
-        </ul>
-
-        {areaSummary.length > 0 && (
-          <div className="mt-8 border-t border-white/25 pt-8 sm:mt-10 sm:pt-10">
-            <div className="hb-calendar-card max-w-3xl">
-              <div className="mb-4 flex items-center gap-2">
-                <span
-                  className="inline-flex rounded-[10px] bg-white/95 p-1.5 shadow-[var(--hb-icon-shadow)]"
-                  aria-hidden
-                >
-                  <CalendarDayIcon size={ICON_SIZES.md} />
-                </span>
-                <h2 className="text-sm font-semibold uppercase tracking-wide text-white">
-                  Delivery calendar
-                </h2>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm text-white/95">
+                  <strong className="font-semibold">{area}</strong>
+                  <span className="text-white/80"> — delivery </span>
+                  <strong className="font-semibold">{daysLabel}</strong>
+                </p>
+                <p className="mt-0.5 text-xs text-white/70">
+                  Change area from the header pin, or browse all schedules.
+                </p>
               </div>
-              <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {areaSummary.map((a) => {
-                  const isActive =
-                    area.trim().toLowerCase() === a.name.trim().toLowerCase();
-                  return (
-                    <li
-                      key={a.name}
-                      className={`hb-calendar-row ${isActive ? 'is-active' : ''}`}
-                      aria-current={isActive ? 'true' : undefined}
-                    >
-                      <LocationPinIcon
-                        size={ICON_SIZES.md}
-                        title={`${a.name} delivery area`}
-                        className="shrink-0 drop-shadow-none"
-                      />
-                      <div className="min-w-0">
-                        <p
-                          className={`truncate text-sm ${isActive ? 'font-bold' : 'font-semibold'}`}
-                        >
-                          {a.name}
-                        </p>
-                        <p className="text-xs text-white/80">
-                          {a.days
-                            .split(',')
-                            .map((d) => formatDay(d))
-                            .join(' · ')}
-                        </p>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
+              <Link
+                to="/delivery-locations"
+                className="hb-calendar-strip__cta shrink-0"
+              >
+                All areas &amp; days
+              </Link>
             </div>
-          </div>
-        )}
+          ) : (
+            <p className="text-sm text-white/85">
+              Choose your area in the header to see your delivery day.{' '}
+              <Link
+                to="/delivery-locations"
+                className="hb-calendar-strip__cta hb-calendar-strip__cta--inline"
+              >
+                All areas &amp; days
+              </Link>
+            </p>
+          )}
+        </div>
       </div>
     </section>
   );

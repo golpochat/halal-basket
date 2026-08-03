@@ -168,7 +168,7 @@ function DropdownPortal({
   );
 }
 
-export type MenuOption = { value: string; label: string };
+export type MenuOption = { value: string; label: string; meta?: string };
 
 export type MenuSelectProps = {
   value: string;
@@ -222,7 +222,11 @@ export function MenuSelect({
   }, [open]);
 
   const selected = options.find((o) => o.value === value);
-  const display = selected?.label ?? placeholder;
+  const display = selected
+    ? selected.meta
+      ? `${selected.label} · ${selected.meta}`
+      : selected.label
+    : placeholder;
 
   return (
     <div className={`relative ${fullWidth ? 'w-full' : 'shrink-0'} ${className}`}>
@@ -294,7 +298,12 @@ export function MenuSelect({
                       setOpen(false);
                     }}
                   >
-                    <span className="truncate">{opt.label}</span>
+                    <span className="min-w-0 flex-1 truncate">{opt.label}</span>
+                    {opt.meta ? (
+                      <span className="shrink-0 tabular-nums text-[var(--hb-ink)]/55">
+                        {opt.meta}
+                      </span>
+                    ) : null}
                   </button>
                 </li>
               );
@@ -485,7 +494,7 @@ export function MenuMultiSelect({
 
 type LocationSelectProps = {
   value: string;
-  options: string[];
+  options: string[] | MenuOption[];
   onChange: (value: string) => void;
   label?: string;
   variant?: 'pill' | 'field';
@@ -495,6 +504,14 @@ type LocationSelectProps = {
   id?: string;
   disabled?: boolean;
 };
+
+function normalizeLocationOptions(
+  options: string[] | MenuOption[],
+): MenuOption[] {
+  return options.map((o) =>
+    typeof o === 'string' ? { value: o, label: o } : o,
+  );
+}
 
 function LocationActionIcon({ children }: { children: ReactNode }) {
   return (
@@ -521,6 +538,7 @@ export function LocationSelect({
   disabled,
 }: LocationSelectProps) {
   const isCompact = variant === 'pill';
+  const menuOptions = normalizeLocationOptions(options);
 
   if (!isCompact) {
     return (
@@ -532,7 +550,7 @@ export function LocationSelect({
         disabled={disabled}
         value={value}
         placeholder={placeholder}
-        options={options.map((o) => ({ value: o, label: o }))}
+        options={menuOptions}
         onChange={onChange}
         fullWidth
         className={className}
@@ -547,7 +565,12 @@ export function LocationSelect({
   const listId = useId();
   const autoId = useId();
   const triggerId = id ?? autoId;
-  const display = value || placeholder;
+  const selectedOpt = menuOptions.find((o) => o.value === value);
+  const display = selectedOpt
+    ? selectedOpt.meta
+      ? `${selectedOpt.label} · ${selectedOpt.meta}`
+      : selectedOpt.label
+    : placeholder;
   const pos = useAnchoredPanel(open, triggerRef, {
     minWidth: 280,
     matchTriggerWidth: false,
@@ -600,7 +623,7 @@ export function LocationSelect({
         ref={triggerRef}
         type="button"
         id={triggerId}
-        disabled={disabled || options.length === 0}
+        disabled={disabled || menuOptions.length === 0}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={listId}
@@ -682,22 +705,27 @@ export function LocationSelect({
                 {locateMsg}
               </li>
             )}
-            {options.map((opt) => {
-              const isSelected = opt === value;
+            {menuOptions.map((opt) => {
+              const isSelected = opt.value === value;
               return (
-                <li key={opt} role="option" aria-selected={isSelected}>
+                <li key={opt.value} role="option" aria-selected={isSelected}>
                   <button
                     type="button"
                     className={`${DROPDOWN_ROW} ${isSelected ? DROPDOWN_ROW_ACTIVE : DROPDOWN_ROW_IDLE}`}
                     onClick={() => {
-                      onChange(opt);
+                      onChange(opt.value);
                       setOpen(false);
                     }}
                   >
                     <span className="hb-icon-utility text-[var(--hb-green)]">
                       {UtilityIcons.location({ size: 16 })}
                     </span>
-                    <span className="truncate">{opt}</span>
+                    <span className="min-w-0 flex-1 truncate">{opt.label}</span>
+                    {opt.meta ? (
+                      <span className="shrink-0 tabular-nums text-[var(--hb-ink)]/55">
+                        {opt.meta}
+                      </span>
+                    ) : null}
                   </button>
                 </li>
               );

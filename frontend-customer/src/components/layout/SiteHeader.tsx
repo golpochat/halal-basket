@@ -50,22 +50,24 @@ export function SiteHeader({
 
   const guestAuthLinks = (
     <>
-      <Link
-        to="/login"
-        className="hb-btn hb-btn-ghost h-10 px-3.5 text-sm"
-        aria-current={onLogin ? 'page' : undefined}
-        onClick={() => setOpen(false)}
-      >
-        Sign in
-      </Link>
-      <Link
-        to="/register"
-        className="hb-btn hb-btn-primary h-10 px-3.5 text-sm"
-        aria-current={onRegister ? 'page' : undefined}
-        onClick={() => setOpen(false)}
-      >
-        Sign up
-      </Link>
+      {!onLogin && (
+        <Link
+          to="/login"
+          className="hb-btn hb-btn-ghost h-10 px-3.5 text-sm"
+          onClick={() => setOpen(false)}
+        >
+          Sign in
+        </Link>
+      )}
+      {!onRegister && (
+        <Link
+          to="/register"
+          className="hb-btn hb-btn-primary h-10 px-3.5 text-sm"
+          onClick={() => setOpen(false)}
+        >
+          Sign up
+        </Link>
+      )}
     </>
   );
 

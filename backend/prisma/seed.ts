@@ -14,12 +14,14 @@ async function upsertUser(input: {
   email: string;
   role: UserRole;
   passwordHash: string;
+  staffRoleId?: string | null;
 }) {
   return prisma.user.upsert({
     where: { email: input.email },
     update: {
       passwordHash: input.passwordHash,
       role: input.role,
+      staffRoleId: input.staffRoleId ?? null,
       isActive: true,
       failedLoginCount: 0,
       lockedUntil: null,
@@ -28,6 +30,7 @@ async function upsertUser(input: {
       email: input.email,
       passwordHash: input.passwordHash,
       role: input.role,
+      staffRoleId: input.staffRoleId ?? null,
       isActive: true,
     },
   });
@@ -36,16 +39,78 @@ async function upsertUser(input: {
 async function main() {
   const passwordHash = await bcrypt.hash(SEED_PASSWORD, 12);
 
+  // Sync RBAC catalog (permissions + system roles)
+  const { PERMISSION_CATALOG, SYSTEM_STAFF_ROLES, SYSTEM_ROLE_SUPER_ADMIN, SYSTEM_ROLE_ADMIN } =
+    await import("../src/modules/rbac/permission-catalog");
+
+  for (const p of PERMISSION_CATALOG) {
+    await prisma.permission.upsert({
+      where: { key: p.key },
+      create: {
+        key: p.key,
+        name: p.name,
+        description: p.description,
+        groupName: p.groupName,
+      },
+      update: {
+        name: p.name,
+        description: p.description,
+        groupName: p.groupName,
+      },
+    });
+  }
+
+  const allPerms = await prisma.permission.findMany({
+    select: { id: true, key: true },
+  });
+  const byKey = new Map(allPerms.map((p) => [p.key, p.id]));
+  const allKeys = [...byKey.keys()];
+
+  async function setRolePerms(roleId: string, keys: string[]) {
+    await prisma.rolePermission.deleteMany({ where: { roleId } });
+    await prisma.rolePermission.createMany({
+      data: keys
+        .filter((k) => byKey.has(k))
+        .map((key) => ({ roleId, permissionId: byKey.get(key)! })),
+    });
+  }
+
+  for (const sys of SYSTEM_STAFF_ROLES) {
+    await prisma.role.upsert({
+      where: { id: sys.id },
+      create: {
+        id: sys.id,
+        name: sys.name,
+        slug: sys.slug,
+        description: sys.description,
+        isSystem: true,
+        isActive: true,
+      },
+      update: {
+        name: sys.name,
+        description: sys.description,
+        isSystem: true,
+        isActive: true,
+      },
+    });
+    await setRolePerms(
+      sys.id,
+      sys.permissionKeys === "all" ? allKeys : [...sys.permissionKeys],
+    );
+  }
+
   const superAdmin = await upsertUser({
     email: "superadmin@halalbasket.ie",
     role: UserRole.super_admin,
     passwordHash,
+    staffRoleId: SYSTEM_ROLE_SUPER_ADMIN.id,
   });
 
   const admin = await upsertUser({
     email: "admin@halalbasket.ie",
     role: UserRole.admin,
     passwordHash,
+    staffRoleId: SYSTEM_ROLE_ADMIN.id,
   });
 
   const shopUser = await upsertUser({
@@ -283,11 +348,100 @@ async function main() {
     {
       key: "coupons",
       value: JSON.stringify([
-        { code: "HALAL10", type: "percent", value: 10, active: true },
-        { code: "WELCOME5", type: "fixed", value: 5, active: true },
+        {
+          code: 'HALAL10',
+          type: 'percent',
+          value: 10,
+          active: true,
+          startsAt: null,
+          endsAt: null,
+          maxLimit: null,
+          maxLimitPerUser: null,
+        },
+        {
+          code: 'WELCOME5',
+          type: 'fixed',
+          value: 5,
+          active: true,
+          startsAt: null,
+          endsAt: null,
+          maxLimit: null,
+          maxLimitPerUser: 1,
+        },
       ]),
     },
     { key: "warehouse_fulfillment_published", value: "false" },
+    {
+      key: "landing_branding",
+      value: JSON.stringify({
+        version: 2,
+        activeId: "brand-hero-market-spread",
+        items: [
+          {
+            id: "platform-default",
+            heroBackgroundUrl: "",
+            heroTitle: "Halal groceries delivered or ready for pickup",
+            heroSubtitle: "From trusted local shops in Dublin".replace(
+              "local shops",
+              "local " + "halal" + " shops",
+            ),
+            isPlatformDefault: true,
+          },
+          {
+            id: "brand-hero-market-spread",
+            heroBackgroundUrl: "/uploads/branding/hero-bangladeshi-market-spread.png",
+            heroTitle: "Fresh fish, meat & pantry staples",
+            heroSubtitle:
+              "Hilsa, chicken, beef, lamb, rice, daal, and Bengali vegetables — pickup or delivery across Dublin.",
+            isPlatformDefault: false,
+          },
+          {
+            id: "brand-hero-feast-proteins",
+            heroBackgroundUrl: "/uploads/branding/hero-bangladeshi-feast-proteins.png",
+            heroTitle: "Halal meats & Bengali feast favourites",
+            heroSubtitle:
+              "Chicken, duck, goat, and river fish with rice, lentils, pitha, misti, and chai.",
+            isPlatformDefault: false,
+          },
+          {
+            id: "brand-hero-produce-pantry",
+            heroBackgroundUrl: "/uploads/branding/hero-bangladeshi-produce-pantry.png",
+            heroTitle: "Vegetables, grains & everyday essentials",
+            heroSubtitle:
+              "Seasonal produce, chickpeas, daal, rice, doi, sweets, and tea for the family table.",
+            isPlatformDefault: false,
+          },
+          {
+            id: "brand-hero-butcher-counter",
+            heroBackgroundUrl: "/uploads/branding/hero-bangladeshi-butcher-counter.png",
+            heroTitle: "Butcher-fresh, market trusted",
+            heroSubtitle:
+              "Premium cuts of beef, goat, poultry, and fish — sourced for Dublin’s halal kitchens.",
+            isPlatformDefault: false,
+          },
+          {
+            id: "brand-hero-tea-sweets",
+            heroBackgroundUrl: "/uploads/branding/hero-bangladeshi-tea-sweets.png",
+            heroTitle: "Tea time, misti & comfort classics",
+            heroSubtitle:
+              "Pitha, doi, dates, biscuits, and chai — the sweet side of a Bangladeshi pantry.",
+            isPlatformDefault: false,
+          },
+          {
+            id: "brand-hero-bazaar-harvest",
+            heroBackgroundUrl: "/uploads/branding/hero-bangladeshi-bazaar-harvest.png",
+            heroTitle: "Bazaar harvest, delivered to your door",
+            heroSubtitle:
+              "A full Sunday-market spread of greens, spices, grains, fish, and lamb — ready when you are.",
+            isPlatformDefault: false,
+          },
+        ],
+      }),
+    },
+    {
+      key: "hero_background_url",
+      value: "/uploads/branding/hero-bangladeshi-market-spread.png",
+    },
   ];
   for (const row of feeSettings) {
     await prisma.platformSetting.upsert({
@@ -405,26 +559,30 @@ async function main() {
     });
   }
 
-  const featuredSeed = [
-    { categoryId: "meat-poultry", sortOrder: 0 },
-    { categoryId: "fruits-veg", sortOrder: 1 },
-    { categoryId: "cooking", sortOrder: 2 },
-    { categoryId: "beverages", sortOrder: 3 },
-    { categoryId: "home-cleaning", sortOrder: 4 },
-    { categoryId: "dairy", sortOrder: 5 },
-  ];
-
-  for (const row of featuredSeed) {
-    await prisma.featuredCategory.upsert({
-      where: { categoryId: row.categoryId },
+  const { LEGAL_DOCUMENT_SEEDS } = await import("./legal-seeds");
+  const now = new Date();
+  for (const doc of LEGAL_DOCUMENT_SEEDS) {
+    await prisma.legalDocument.upsert({
+      where: { slug: doc.slug },
       update: {
-        sortOrder: row.sortOrder,
-        isActive: true,
+        title: doc.title,
+        subtitle: doc.subtitle,
+        bodyMarkdown: doc.bodyMarkdown,
+        sortOrder: doc.sortOrder,
+        isPublished: true,
+        showInFooter: true,
+        publishedAt: now,
       },
       create: {
-        categoryId: row.categoryId,
-        sortOrder: row.sortOrder,
-        isActive: true,
+        slug: doc.slug,
+        title: doc.title,
+        subtitle: doc.subtitle,
+        bodyMarkdown: doc.bodyMarkdown,
+        sortOrder: doc.sortOrder,
+        isPublished: true,
+        showInFooter: true,
+        version: 1,
+        publishedAt: now,
       },
     });
   }
@@ -443,6 +601,7 @@ async function main() {
   console.log("Seeded currencies: EUR (default published), GBP, USD");
   console.log("Seeded languages: en (default published), bn, hi, ur, ar");
   console.log("Seeded featured categories: 6 catalogue roots");
+  console.log("Seeded legal documents: privacy, terms, cookies, refunds");
 }
 
 main()

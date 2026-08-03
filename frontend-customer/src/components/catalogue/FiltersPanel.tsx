@@ -48,7 +48,7 @@ export function FiltersPanel() {
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <TextInput
-            label="Min price (€)"
+            label="Min price"
             type="number"
             min={0}
             step="0.01"
@@ -60,7 +60,7 @@ export function FiltersPanel() {
             }
           />
           <TextInput
-            label="Max price (€)"
+            label="Max price"
             type="number"
             min={0}
             step="0.01"

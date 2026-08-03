@@ -57,3 +57,26 @@ export function formatFulfillmentMode(mode: string): string {
   }
   return titleCaseWords(mode);
 }
+
+const PAYMENT_LABELS: Record<string, string> = {
+  pending: 'Pending',
+  paid: 'Paid',
+  failed: 'Failed',
+  refunded: 'Refunded',
+};
+
+const ORDER_STATUS_LABELS: Record<string, string> = {
+  pending: 'Pending',
+  confirmed: 'Confirmed',
+  in_progress: 'In progress',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+};
+
+export function formatPaymentStatus(status: string): string {
+  return PAYMENT_LABELS[status] ?? titleCaseWords(status);
+}
+
+export function formatOrderStatus(status: string): string {
+  return ORDER_STATUS_LABELS[status] ?? titleCaseWords(status);
+}

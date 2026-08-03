@@ -93,18 +93,62 @@ model User {
   phone             String?   @unique
   passwordHash      String    @map("password_hash")
   role              UserRole
+  /// Dynamic staff role (admin portal). Portal type still uses `role` enum.
+  staffRoleId       String?   @map("staff_role_id")
   avatarUrl         String?   @map("avatar_url")
   isActive          Boolean   @default(true) @map("is_active")
   failedLoginCount  Int       @default(0) @map("failed_login_count")
   lockedUntil       DateTime? @map("locked_until")
   createdAt         DateTime  @default(now()) @map("created_at")
 
+  staffRole Role?          @relation(fields: [staffRoleId], references: [id], onDelete: SetNull)
   customer  Customer?
   shopUsers ShopUser[]
   driver    Driver?
   events    OrderEvent[] @relation("EventActor")
 
+  @@index([staffRoleId])
   @@map("users")
+}
+
+model Permission {
+  id          String @id @default(uuid())
+  key         String @unique
+  name        String
+  description String?
+  groupName   String @map("group_name")
+
+  rolePermissions RolePermission[]
+
+  @@index([groupName])
+  @@map("permissions")
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique
+  description String?
+  isSystem    Boolean  @default(false) @map("is_system")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  permissions RolePermission[]
+  users       User[]
+
+  @@map("roles")
+}
+
+model RolePermission {
+  roleId       String @map("role_id")
+  permissionId String @map("permission_id")
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
 }
 
 model Customer {
@@ -119,6 +163,7 @@ model Customer {
   orders    Order[]
   feedback  DriverFeedback[]
   stockHolds StockHold[]
+  favourites CustomerFavourite[]
 
   @@map("customers")
 }
@@ -165,8 +210,23 @@ model Product {
   shopProducts ShopProduct[]
   orderItems   OrderItem[]
   holdLines    StockHoldLine[]
+  favourites   CustomerFavourite[]
 
   @@map("products")
+}
+
+model CustomerFavourite {
+  id         String   @id @default(uuid())
+  customerId String   @map("customer_id")
+  productId  String   @map("product_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, productId])
+  @@index([customerId, createdAt])
+  @@map("customer_favourites")
 }
 
 model Shop {
@@ -452,4 +512,24 @@ model FeaturedCategory {
 
   @@index([isActive, sortOrder])
   @@map("featured_categories")
+}
+
+/// Customer-facing legal policies (Privacy, Terms, Cookies, Refunds, …).
+/// Body is Markdown; admin-editable; published docs appear on the storefront.
+model LegalDocument {
+  id           String    @id @default(uuid())
+  slug         String    @unique
+  title        String
+  subtitle     String?
+  bodyMarkdown String    @map("body_markdown") @db.Text
+  sortOrder    Int       @default(0) @map("sort_order")
+  isPublished  Boolean   @default(false) @map("is_published")
+  showInFooter Boolean   @default(true) @map("show_in_footer")
+  version      Int       @default(1)
+  publishedAt  DateTime? @map("published_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@index([isPublished, showInFooter, sortOrder])
+  @@map("legal_documents")
 }
