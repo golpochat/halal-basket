@@ -1,13 +1,16 @@
 import {
   resolveFeaturedCategories,
   CategoryIconBadge,
+  categoryDisplayName,
   useCatalogueStore,
   useFeaturedCategoriesQuery,
   type CategoryNode,
 } from '@halal-basket/web';
 import { api } from '../../lib/api';
+import { useLocale } from '../../locale/LocaleContext';
 
 export function PopularCategories() {
+  const { t, languageCode } = useLocale();
   const setCategory = useCatalogueStore((s) => s.setCategory);
   const active = useCatalogueStore((s) => s.category);
   const featuredQuery = useFeaturedCategoriesQuery(api);
@@ -33,14 +36,15 @@ export function PopularCategories() {
           id="popular-categories-heading"
           className="font-display text-2xl font-semibold tracking-tight sm:text-3xl"
         >
-          Popular categories
+          {t('catalogue.popularTitle')}
         </h2>
         <p className="mt-1 text-sm text-[var(--hb-ink)]/55 sm:text-base">
-          Jump straight to what you need
+          {t('catalogue.popularSubtitle')}
         </p>
         <ul className={gridClass}>
           {cats.map((c: CategoryNode) => {
             const selected = active === c.id;
+            const label = categoryDisplayName(c, languageCode);
             return (
               <li key={c.id}>
                 <button
@@ -55,11 +59,11 @@ export function PopularCategories() {
                     selected ? 'is-selected' : 'text-[var(--hb-ink)]'
                   }`}
                   aria-pressed={selected}
-                  aria-label={`Browse ${c.name}`}
+                  aria-label={t('catalogue.browseCategory', { name: label })}
                 >
                   <CategoryIconBadge id={c.id} size="xl" />
                   <span className="text-sm font-semibold leading-snug sm:text-base">
-                    {c.name}
+                    {label}
                   </span>
                 </button>
               </li>

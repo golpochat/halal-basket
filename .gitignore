@@ -15,4 +15,5 @@ backend/prisma/*.db
 backend/prisma/*.db-journal
 
 backend/prisma/generated/
+backend/prisma/product-images/
 

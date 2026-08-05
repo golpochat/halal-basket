@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {
   CATEGORY_TREE,
+  categoryDisplayName,
   categoryIcon,
   IconButton,
   UtilityIcons,
@@ -11,18 +12,21 @@ import {
   type CategoryNode,
 } from '@halal-basket/web';
 import { api } from '../../lib/api';
+import { useLocale } from '../../locale/LocaleContext';
 
 function TreeNode({
   node,
   depth,
   expandedId,
   onExpand,
+  lang,
 }: {
   node: CategoryNode;
   depth: number;
   /** Top-level accordion: which browse root is open (null = all collapsed) */
   expandedId: string | null;
   onExpand: (id: string | null) => void;
+  lang: string;
 }) {
   const active = useCatalogueStore((s) => s.category);
   const setCategory = useCatalogueStore((s) => s.setCategory);
@@ -32,6 +36,7 @@ function TreeNode({
   const [nestedOpen, setNestedOpen] = useState(false);
   const open = isRoot ? expandedId === node.id : nestedOpen;
   const isActive = active === node.id;
+  const label = categoryDisplayName(node, lang);
 
   function toggleExpand() {
     if (isRoot) {
@@ -49,7 +54,7 @@ function TreeNode({
             type="button"
             className="rounded p-1 text-[var(--hb-ink)]/50 transition duration-[220ms] ease-[var(--hb-ease-out)] hover:bg-[var(--hb-mist)] hover:text-[var(--hb-green)] focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(47,143,91,0.28)]"
             aria-expanded={open}
-            aria-label={open ? `Collapse ${node.name}` : `Expand ${node.name}`}
+            aria-label={open ? `Collapse ${label}` : `Expand ${label}`}
             onClick={toggleExpand}
           >
             <span
@@ -84,7 +89,7 @@ function TreeNode({
               size: ICON_SIZES.sm,
             })}
           </span>
-          <span className="truncate">{node.name}</span>
+          <span className="truncate">{label}</span>
         </button>
       </div>
       {hasChildren && open && (
@@ -96,6 +101,7 @@ function TreeNode({
               depth={depth + 1}
               expandedId={expandedId}
               onExpand={onExpand}
+              lang={lang}
             />
           ))}
         </div>
@@ -105,6 +111,7 @@ function TreeNode({
 }
 
 export function CategorySidebar() {
+  const { t, languageCode } = useLocale();
   const active = useCatalogueStore((s) => s.category);
   const setCategory = useCatalogueStore((s) => s.setCategory);
   const open = useCatalogueStore((s) => s.sidebarOpen);
@@ -117,15 +124,15 @@ export function CategorySidebar() {
   const popular = resolveFeaturedCategories(featuredQuery.data?.categories);
 
   const list = (
-    <nav aria-label="Categories" className="flex flex-col p-3 pb-8">
+    <nav aria-label={t('sidebar.categories')} className="flex flex-col p-3 pb-8">
       <p className="mb-3 px-2 text-xs font-semibold uppercase tracking-wide text-[var(--hb-ink)]/45">
-        Categories
+        {t('sidebar.categories')}
       </p>
 
       {popular.length > 0 && (
         <div className="hb-sidebar-group">
           <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wide text-[var(--hb-ink)]/40">
-            Popular
+            {t('sidebar.popular')}
           </p>
           {popular.map((n) => (
             <button
@@ -150,14 +157,16 @@ export function CategorySidebar() {
               >
                 {categoryIcon(n.id, { size: ICON_SIZES.sm })}
               </span>
-              <span className="truncate">{n.name}</span>
+              <span className="truncate">
+                {categoryDisplayName(n, languageCode)}
+              </span>
             </button>
           ))}
         </div>
       )}
 
       <p className="mb-1 mt-4 px-2 text-[10px] font-semibold uppercase tracking-wide text-[var(--hb-ink)]/40">
-        Browse
+        {t('sidebar.browse')}
       </p>
       {CATEGORY_TREE.map((node) => (
         <div key={node.id} className="hb-sidebar-group">
@@ -166,6 +175,7 @@ export function CategorySidebar() {
             depth={0}
             expandedId={browseExpandedId}
             onExpand={setBrowseExpandedId}
+            lang={languageCode}
           />
         </div>
       ))}
@@ -191,7 +201,7 @@ export function CategorySidebar() {
         <button
           type="button"
           className={`hb-sidebar-scrim absolute inset-0 bg-black/35 ${open ? 'opacity-100' : 'opacity-0'}`}
-          aria-label="Close categories"
+          aria-label={t('sidebar.closeCategories')}
           onClick={() => setSidebarOpen(false)}
           tabIndex={open ? 0 : -1}
         />
@@ -201,12 +211,12 @@ export function CategorySidebar() {
               ? 'translate-x-0 shadow-[var(--hb-shadow-lg)]'
               : '-translate-x-full shadow-none'
           }`}
-          aria-label="Category navigation"
+          aria-label={t('sidebar.categories')}
         >
           <div className="flex items-center justify-between border-b border-[rgba(26,92,58,0.1)] px-4 py-3">
-            <p className="font-semibold">Categories</p>
+            <p className="font-semibold">{t('sidebar.categories')}</p>
             <IconButton
-              label="Close categories"
+              label={t('sidebar.closeCategories')}
               onClick={() => setSidebarOpen(false)}
             >
               {UtilityIcons.close({ size: ICON_SIZES.sm })}

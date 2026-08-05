@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react';
-import { HalalBadge, PartnerBadge } from './Badge';
 import { Button } from './Button';
 import { IconButton } from './IconButton';
 import { ProductImage } from './ProductImage';
@@ -11,25 +10,56 @@ export type ProductCardData = {
   name: string;
   price: number;
   imageUrl?: string | null;
+  /** Seller / fulfilled-by name when multi-source catalogue is live */
   shopName?: string;
   stock: StockLevel;
-  verifiedHalal?: boolean;
-  shopPartner?: boolean;
 };
 
-function stockLabel(stock: StockLevel) {
+export type ProductCardLabels = {
+  add: string;
+  inStock: string;
+  lowStock: string;
+  outOfStock: string;
+  saveFavourite: string;
+  removeFavourite: string;
+  decreaseAria: string;
+  increaseAria: string;
+};
+
+const DEFAULT_LABELS: ProductCardLabels = {
+  add: 'Add',
+  inStock: 'In stock',
+  lowStock: 'Low stock',
+  outOfStock: 'Out of stock',
+  saveFavourite: 'Save to favourites',
+  removeFavourite: 'Remove from favourites',
+  decreaseAria: 'Decrease {name}',
+  increaseAria: 'Increase {name}',
+};
+
+function fillName(template: string, name: string) {
+  return template.replaceAll('{name}', name);
+}
+
+function stockLabel(stock: StockLevel, labels: ProductCardLabels) {
   switch (stock) {
     case 'in_stock':
-      return 'In stock';
+      return labels.inStock;
     case 'low_stock':
-      return 'Low stock';
+      return labels.lowStock;
     default:
-      return 'Out of stock';
+      return labels.outOfStock;
   }
 }
 
-function StockStatus({ stock }: { stock: StockLevel }) {
-  const label = stockLabel(stock);
+function StockStatus({
+  stock,
+  labels,
+}: {
+  stock: StockLevel;
+  labels: ProductCardLabels;
+}) {
+  const label = stockLabel(stock, labels);
   const color =
     stock === 'in_stock'
       ? 'text-[var(--hb-icon-brand-soft)]'
@@ -49,13 +79,15 @@ function StockStatus({ stock }: { stock: StockLevel }) {
 function FavouriteControl({
   favourited,
   onToggleFavourite,
+  labels,
 }: {
   favourited: boolean;
   onToggleFavourite: () => void;
+  labels: ProductCardLabels;
 }) {
   return (
     <IconButton
-      label={favourited ? 'Remove from favourites' : 'Save to favourites'}
+      label={favourited ? labels.removeFavourite : labels.saveFavourite}
       className="hb-product-card__fav"
       onClick={(e) => {
         e.preventDefault();
@@ -76,26 +108,37 @@ export function ProductCard({
   onAdd,
   onDec,
   formatMoney,
+  formatQty,
   layout = 'grid',
   favourited,
   onToggleFavourite,
+  labels: labelsProp,
+  displayName,
 }: {
   product: ProductCardData;
   qty: number;
   onAdd: () => void;
   onDec: () => void;
   formatMoney: (n: number) => string;
+  /** Locale-aware qty digits; defaults to Latin String(qty). */
+  formatQty?: (n: number) => string;
   layout?: 'grid' | 'list';
   favourited?: boolean;
   onToggleFavourite?: () => void;
+  labels?: Partial<ProductCardLabels>;
+  /** Localized title; falls back to product.name */
+  displayName?: string;
 }) {
+  const labels = { ...DEFAULT_LABELS, ...labelsProp };
+  const title = displayName ?? product.name;
+  const qtyText = formatQty ? formatQty(qty) : String(qty);
   const outOfStock = product.stock === 'out_of_stock';
   const canAdd = !outOfStock;
   const showFav = typeof onToggleFavourite === 'function';
 
   const oosLabel = outOfStock ? (
     <div className="hb-product-card__oos-label" aria-hidden>
-      <span>Out of stock</span>
+      <span>{labels.outOfStock}</span>
     </div>
   ) : null;
 
@@ -110,20 +153,21 @@ export function ProductCard({
         aria-disabled={outOfStock || undefined}
       >
         <div className="hb-product-card__media relative h-24 w-24 shrink-0 overflow-hidden rounded-[var(--hb-radius)] sm:h-28 sm:w-28">
-          <ProductImage src={product.imageUrl} alt={product.name} size="sm" />
+          <ProductImage src={product.imageUrl} alt={title} size="sm" />
           {oosLabel}
           {showFav ? (
             <div className="hb-product-card__fav-wrap">
               <FavouriteControl
                 favourited={Boolean(favourited)}
                 onToggleFavourite={onToggleFavourite!}
+                labels={labels}
               />
             </div>
           ) : null}
         </div>
         <div className="flex min-w-0 flex-1 flex-col sm:flex-row sm:items-center sm:justify-between sm:gap-4">
           <div className="min-w-0">
-            <h2 className="truncate font-semibold">{product.name}</h2>
+            <h2 className="truncate font-semibold">{title}</h2>
             {product.shopName && (
               <p className="mt-0.5 text-xs text-[var(--hb-ink)]/50">
                 {product.shopName}
@@ -133,8 +177,7 @@ export function ProductCard({
               <p className="font-display text-xl font-semibold">
                 {formatMoney(product.price)}
               </p>
-              <StockStatus stock={product.stock} />
-              {product.verifiedHalal && <HalalBadge />}
+              <StockStatus stock={product.stock} labels={labels} />
             </div>
           </div>
           <div className="mt-3 sm:mt-0">
@@ -144,25 +187,25 @@ export function ProductCard({
                   variant="tertiary"
                   size="sm"
                   onClick={onDec}
-                  aria-label={`Decrease ${product.name}`}
+                  aria-label={fillName(labels.decreaseAria, title)}
                 >
                   −
                 </Button>
-                <span className="min-w-5 text-center text-sm font-semibold">
-                  {qty}
+                <span className="min-w-5 text-center text-sm font-semibold tabular-nums">
+                  {qtyText}
                 </span>
                 <Button
                   variant="primary"
                   size="sm"
                   onClick={onAdd}
-                  aria-label={`Increase ${product.name}`}
+                  aria-label={fillName(labels.increaseAria, title)}
                 >
                   +
                 </Button>
               </div>
             ) : (
               <Button variant="primary" size="sm" onClick={onAdd}>
-                Add
+                {labels.add}
               </Button>
             )}
           </div>
@@ -179,17 +222,14 @@ export function ProductCard({
       aria-disabled={outOfStock || undefined}
     >
       <div className="hb-product-card__media relative aspect-[4/3] overflow-hidden">
-        <ProductImage src={product.imageUrl} alt={product.name} size="md" />
+        <ProductImage src={product.imageUrl} alt={title} size="md" />
         {oosLabel}
-        <div className="hb-product-card__badges">
-          {product.verifiedHalal && <HalalBadge />}
-          {product.shopPartner && <PartnerBadge />}
-        </div>
         {showFav ? (
           <div className="hb-product-card__fav-wrap">
             <FavouriteControl
               favourited={Boolean(favourited)}
               onToggleFavourite={onToggleFavourite!}
+              labels={labels}
             />
           </div>
         ) : null}
@@ -197,7 +237,7 @@ export function ProductCard({
 
       <div className="flex flex-1 flex-col gap-1 p-3 sm:p-4">
         <h2 className="line-clamp-2 text-sm font-semibold leading-snug sm:text-base">
-          {product.name}
+          {title}
         </h2>
         {product.shopName && (
           <p className="text-xs text-[var(--hb-ink)]/50">{product.shopName}</p>
@@ -208,7 +248,7 @@ export function ProductCard({
               {formatMoney(product.price)}
             </p>
             <p className="mt-1">
-              <StockStatus stock={product.stock} />
+              <StockStatus stock={product.stock} labels={labels} />
             </p>
           </div>
           {!canAdd ? null : qty > 0 ? (
@@ -217,25 +257,25 @@ export function ProductCard({
                 variant="tertiary"
                 size="sm"
                 onClick={onDec}
-                aria-label={`Decrease ${product.name}`}
+                aria-label={fillName(labels.decreaseAria, title)}
               >
                 −
               </Button>
-              <span className="min-w-5 text-center text-sm font-semibold">
-                {qty}
+              <span className="min-w-5 text-center text-sm font-semibold tabular-nums">
+                {qtyText}
               </span>
               <Button
                 variant="primary"
                 size="sm"
                 onClick={onAdd}
-                aria-label={`Increase ${product.name}`}
+                aria-label={fillName(labels.increaseAria, title)}
               >
                 +
               </Button>
             </div>
           ) : (
             <Button variant="primary" size="sm" onClick={onAdd}>
-              Add
+              {labels.add}
             </Button>
           )}
         </div>

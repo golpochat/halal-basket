@@ -5,24 +5,26 @@ import {
   MenuSelect,
   useCatalogueStore,
 } from '@halal-basket/web';
-
-const DELIVERY_OPTIONS = [
-  { value: 'any', label: 'Any' },
-  { value: 'scheduled', label: 'Scheduled delivery' },
-  { value: 'pickup', label: 'Pickup' },
-] as const;
+import { useLocale } from '../../locale/LocaleContext';
 
 export function FiltersPanel() {
+  const { t } = useLocale();
   const open = useCatalogueStore((s) => s.filtersOpen);
   const setFiltersOpen = useCatalogueStore((s) => s.setFiltersOpen);
   const filters = useCatalogueStore((s) => s.filters);
   const setFilters = useCatalogueStore((s) => s.setFilters);
   const resetFilters = useCatalogueStore((s) => s.resetFilters);
 
+  const deliveryOptions = [
+    { value: 'any', label: t('catalogue.deliveryAny') },
+    { value: 'scheduled', label: t('catalogue.deliveryScheduled') },
+    { value: 'pickup', label: t('catalogue.deliveryPickup') },
+  ];
+
   return (
     <Modal
       open={open}
-      title="Filters"
+      title={t('catalogue.filters')}
       onClose={() => setFiltersOpen(false)}
       footer={
         <div className="flex gap-2">
@@ -33,14 +35,14 @@ export function FiltersPanel() {
               resetFilters();
             }}
           >
-            Reset
+            {t('catalogue.reset')}
           </Button>
           <Button
             variant="primary"
             className="h-10 flex-1"
             onClick={() => setFiltersOpen(false)}
           >
-            Apply
+            {t('catalogue.apply')}
           </Button>
         </div>
       }
@@ -48,7 +50,7 @@ export function FiltersPanel() {
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <TextInput
-            label="Min price"
+            label={t('catalogue.minPrice')}
             type="number"
             min={0}
             step="0.01"
@@ -60,7 +62,7 @@ export function FiltersPanel() {
             }
           />
           <TextInput
-            label="Max price"
+            label={t('catalogue.maxPrice')}
             type="number"
             min={0}
             step="0.01"
@@ -79,13 +81,13 @@ export function FiltersPanel() {
             onChange={(e) => setFilters({ inStockOnly: e.target.checked })}
             className="h-4 w-4 accent-[var(--hb-green)]"
           />
-          In stock only
+          {t('catalogue.inStockOnly')}
         </label>
         <MenuSelect
-          label="Delivery type"
+          label={t('catalogue.deliveryType')}
           showLabel
           value={filters.deliveryType}
-          options={[...DELIVERY_OPTIONS]}
+          options={deliveryOptions}
           onChange={(v) =>
             setFilters({
               deliveryType: v as typeof filters.deliveryType,
@@ -94,8 +96,7 @@ export function FiltersPanel() {
           fullWidth
         />
         <p className="text-xs text-[var(--hb-ink)]/50">
-          Preference only — choose pickup, scheduled, or realtime (when
-          enabled) at checkout. Realtime availability is confirmed there.
+          {t('catalogue.filtersHint')}
         </p>
       </div>
     </Modal>

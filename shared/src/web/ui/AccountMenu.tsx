@@ -15,7 +15,7 @@ export type AccountMenuItem = {
   label: string;
   to?: string;
   href?: string;
-  icon?: 'home' | 'account' | 'package' | 'logout';
+  icon?: 'home' | 'account' | 'package' | 'logout' | 'heart';
   danger?: boolean;
   onClick?: () => void;
 };
@@ -31,6 +31,11 @@ type Props = {
   /** Use portal + fixed positioning (site chrome). Inline absolute for dashboards. */
   portal?: boolean;
   triggerClassName?: string;
+  signOutLabel?: string;
+  accountLabel?: string;
+  accountMenuAriaLabel?: string;
+  closeMenuAriaLabel?: string;
+  myProfileLabel?: string;
 };
 
 function MenuIcon({ name }: { name: NonNullable<AccountMenuItem['icon']> }) {
@@ -110,6 +115,11 @@ export function AccountMenu({
   onLogout,
   portal = false,
   triggerClassName,
+  signOutLabel = 'Sign out',
+  accountLabel = 'Account',
+  accountMenuAriaLabel = 'Account menu',
+  closeMenuAriaLabel = 'Close account menu',
+  myProfileLabel = 'My Profile',
 }: Props) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -163,7 +173,7 @@ export function AccountMenu({
       ? [
           {
             key: 'profile',
-            label: 'My Profile',
+            label: myProfileLabel,
             to: profileTo,
             icon: 'account' as const,
           },
@@ -171,7 +181,7 @@ export function AccountMenu({
       : []),
     {
       key: 'logout',
-      label: 'Sign out',
+      label: signOutLabel,
       icon: 'logout' as const,
       danger: true,
       onClick: onLogout,
@@ -198,7 +208,7 @@ export function AccountMenu({
         <UserAvatar label={email} src={avatarUrl} size="lg" />
         <div className="hb-dashboard__profile-card-text">
           <p className="hb-dashboard__profile-card-name" title={email ?? undefined}>
-            {email ?? 'Account'}
+            {email ?? accountLabel}
           </p>
           {roleLabel ? (
             <p className="hb-dashboard__profile-card-role">{roleLabel}</p>
@@ -218,7 +228,7 @@ export function AccountMenu({
         className={triggerClassName ?? 'hb-dashboard__profile-trigger'}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label="Account menu"
+        aria-label={accountMenuAriaLabel}
         onClick={() => setOpen((v) => !v)}
       >
         <UserAvatar label={email} src={avatarUrl} />
@@ -229,7 +239,7 @@ export function AccountMenu({
               <button
                 type="button"
                 className="fixed inset-0 z-[70] cursor-default bg-transparent"
-                aria-label="Close account menu"
+                aria-label={closeMenuAriaLabel}
                 onClick={close}
               />
               {pos ? menu : null}

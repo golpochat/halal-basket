@@ -701,32 +701,52 @@ export class PlatformLocaleService {
   ) {
     const code = dto.code.trim().toUpperCase();
     if (!code) {
-      return { ok: false as const, message: 'Enter a code' };
+      return {
+        ok: false as const,
+        message: 'Enter a code',
+        reason: 'enter_code' as const,
+      };
     }
     const coupons = await this.getCoupons();
     const rule = coupons.find((c) => c.code === code && c.active);
     if (!rule) {
-      return { ok: false as const, message: 'Code not recognised' };
+      return {
+        ok: false as const,
+        message: 'Code not recognised',
+        reason: 'not_recognised' as const,
+      };
     }
 
     const now = Date.now();
     if (rule.startsAt) {
       const start = Date.parse(rule.startsAt);
       if (Number.isFinite(start) && now < start) {
-        return { ok: false as const, message: 'Code is not active yet' };
+        return {
+          ok: false as const,
+          message: 'Code is not active yet',
+          reason: 'not_active' as const,
+        };
       }
     }
     if (rule.endsAt) {
       const end = Date.parse(rule.endsAt);
       if (Number.isFinite(end) && now > end) {
-        return { ok: false as const, message: 'Code has expired' };
+        return {
+          ok: false as const,
+          message: 'Code has expired',
+          reason: 'expired' as const,
+        };
       }
     }
 
     if (rule.maxLimit != null) {
       const used = await this.countCouponRedemptions(rule.code);
       if (used >= rule.maxLimit) {
-        return { ok: false as const, message: 'Code has reached its limit' };
+        return {
+          ok: false as const,
+          message: 'Code has reached its limit',
+          reason: 'limit_reached' as const,
+        };
       }
     }
 
@@ -744,6 +764,7 @@ export class PlatformLocaleService {
         return {
           ok: false as const,
           message: 'Sign in to use this coupon',
+          reason: 'sign_in' as const,
         };
       }
       const usedByCustomer = await this.countCouponRedemptions(
@@ -754,6 +775,7 @@ export class PlatformLocaleService {
         return {
           ok: false as const,
           message: 'You have already used this code',
+          reason: 'already_used' as const,
         };
       }
     }
@@ -767,6 +789,7 @@ export class PlatformLocaleService {
       value: rule.value,
       discountAmount,
       message: `Applied ${rule.code}`,
+      reason: 'applied' as const,
     };
   }
 

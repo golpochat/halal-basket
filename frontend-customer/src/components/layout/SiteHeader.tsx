@@ -3,6 +3,7 @@ import { Link, NavLink, useLocation } from 'react-router-dom';
 import { IconButton, UtilityIcons, ICON_SIZES } from '@halal-basket/web';
 import { BrandLogo } from '../brand/BrandLogo';
 import { useAuth } from '../../auth/AuthContext';
+import { useLocale } from '../../locale/LocaleContext';
 import { ProfileMenu } from './ProfileMenu';
 import { HB_CHROME_BAR } from './chrome';
 
@@ -25,6 +26,7 @@ export function SiteHeader({
   showAuth = true,
 }: SiteHeaderProps) {
   const { session } = useAuth();
+  const { t } = useLocale();
   const location = useLocation();
   const [open, setOpen] = useState(false);
   const isApp = variant === 'app';
@@ -56,7 +58,7 @@ export function SiteHeader({
           className="hb-btn hb-btn-ghost h-10 px-3.5 text-sm"
           onClick={() => setOpen(false)}
         >
-          Sign in
+          {t('chrome.signIn')}
         </Link>
       )}
       {!onRegister && (
@@ -65,7 +67,7 @@ export function SiteHeader({
           className="hb-btn hb-btn-primary h-10 px-3.5 text-sm"
           onClick={() => setOpen(false)}
         >
-          Sign up
+          {t('chrome.signUp')}
         </Link>
       )}
     </>
@@ -78,7 +80,7 @@ export function SiteHeader({
           to={homeTo}
           className="shrink-0"
           onClick={() => setOpen(false)}
-          aria-label="Halal Basket home"
+          aria-label={t('chrome.homeAria')}
         >
           <BrandLogo size="lg" />
         </Link>

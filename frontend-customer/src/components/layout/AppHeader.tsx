@@ -10,7 +10,9 @@ import {
 } from '@halal-basket/web';
 import { BrandLogo } from '../brand/BrandLogo';
 import { useAuth } from '../../auth/AuthContext';
+import { useLocale } from '../../locale/LocaleContext';
 import { ProfileMenu } from './ProfileMenu';
+import { LocalePickers } from '../LocalePickers';
 import { HB_CHROME_BAR } from './chrome';
 
 type AppHeaderProps = {
@@ -20,6 +22,7 @@ type AppHeaderProps = {
 
 export function AppHeader({ areas, showNavSearch = false }: AppHeaderProps) {
   const { session } = useAuth();
+  const { t } = useLocale();
   const area = useCatalogueStore((s) => s.area);
   const setArea = useCatalogueStore((s) => s.setArea);
   const search = useCatalogueStore((s) => s.search);
@@ -47,7 +50,7 @@ export function AppHeader({ areas, showNavSearch = false }: AppHeaderProps) {
           <Link
             to="/"
             className="shrink-0"
-            aria-label="Halal Basket home"
+            aria-label={t('chrome.homeAria')}
             onClick={() => goHome()}
           >
             <BrandLogo size="lg" />
@@ -55,7 +58,9 @@ export function AppHeader({ areas, showNavSearch = false }: AppHeaderProps) {
 
           <IconButton
             label={
-              menuExpanded ? 'Collapse categories' : 'Expand categories'
+              menuExpanded
+                ? t('chrome.collapseCategories')
+                : t('chrome.expandCategories')
             }
             aria-expanded={menuExpanded}
             aria-controls="category-sidebar"
@@ -81,17 +86,17 @@ export function AppHeader({ areas, showNavSearch = false }: AppHeaderProps) {
             value={area}
             options={areas}
             onChange={setArea}
-            label="Delivery area"
+            label={t('chrome.deliveryArea')}
           />
         )}
 
         {showNavSearch ? (
           <div className="mx-2 hidden min-w-0 max-w-xl flex-1 md:block">
             <SearchInput
-              placeholder="Search products…"
+              placeholder={t('chrome.searchProducts')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              aria-label="Search products"
+              aria-label={t('chrome.searchAria')}
             />
           </div>
         ) : (
@@ -99,13 +104,14 @@ export function AppHeader({ areas, showNavSearch = false }: AppHeaderProps) {
         )}
 
         <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-2.5">
+          <LocalePickers />
           {showNavSearch && (
             <div className="w-[7.5rem] sm:w-40 md:hidden">
               <SearchInput
-                placeholder="Search…"
+                placeholder={t('chrome.searchShort')}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                aria-label="Search products"
+                aria-label={t('chrome.searchAria')}
               />
             </div>
           )}
@@ -116,13 +122,13 @@ export function AppHeader({ areas, showNavSearch = false }: AppHeaderProps) {
                 to="/login"
                 className="hb-btn hb-btn-ghost h-10 px-3.5 text-sm"
               >
-                Sign in
+                {t('chrome.signIn')}
               </Link>
               <Link
                 to="/register"
                 className="hb-btn hb-btn-primary h-10 px-3.5 text-sm"
               >
-                Sign up
+                {t('chrome.signUp')}
               </Link>
             </>
           ) : (

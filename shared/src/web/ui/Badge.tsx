@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react';
-import { BadgeHalalIcon, BadgePartnerIcon, ICON_SIZES } from '../../../icons';
 
 export function InfoCard({
   children,
@@ -39,21 +38,5 @@ export function Badge({
       {icon}
       {children}
     </span>
-  );
-}
-
-export function HalalBadge() {
-  return (
-    <Badge tone="gold" icon={<BadgeHalalIcon size={ICON_SIZES.badge} />}>
-      Halal
-    </Badge>
-  );
-}
-
-export function PartnerBadge() {
-  return (
-    <Badge tone="green" icon={<BadgePartnerIcon size={ICON_SIZES.badge} />}>
-      Partner
-    </Badge>
   );
 }

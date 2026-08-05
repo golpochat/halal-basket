@@ -12,6 +12,7 @@ import {
   AuthSession,
   homeForRole,
 } from '../lib/api';
+import { useLocale } from '../locale/LocaleContext';
 
 export function LoginPage() {
   return (
@@ -23,6 +24,7 @@ export function LoginPage() {
 
 function LoginForm() {
   const { setSession } = useAuth();
+  const { t } = useLocale();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const [email, setEmail] = useState('');
@@ -113,7 +115,7 @@ function LoginForm() {
             disabled={loading}
             className="hb-btn hb-btn-primary w-full py-3"
           >
-            {loading ? 'Signing in…' : 'Sign in'}
+            {loading ? t('chrome.signingIn') : t('chrome.signIn')}
           </button>
           <p className="text-center text-sm text-[var(--hb-ink)]/55">
             <Link to="/">← Back home</Link>

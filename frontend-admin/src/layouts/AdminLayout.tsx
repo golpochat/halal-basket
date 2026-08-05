@@ -4,6 +4,7 @@ import { DashboardShell, type DashboardNavItem } from '@halal-basket/web';
 import { RequireAuth, RequireRole } from '../auth/guards';
 import { useAuth } from '../auth/AuthContext';
 import { BrandLogo } from '../components/brand/BrandLogo';
+import { LocalePickers } from '../components/LocalePickers';
 
 type NavDef = DashboardNavItem & {
   permission?: string;
@@ -33,6 +34,7 @@ const PLATFORM_PATH_SUFFIXES = [
   '/featured',
   '/legal',
   '/gdpr',
+  '/whatsapp',
   '/ops-drill',
 ] as const;
 
@@ -125,6 +127,12 @@ function platformNav(base: string): NavDef[] {
       label: 'Privacy',
       icon: 'shield',
       permission: 'gdpr.read',
+    },
+    {
+      to: `${base}/whatsapp`,
+      label: 'WhatsApp',
+      icon: 'phone',
+      permission: 'whatsapp.read',
     },
     {
       to: `${base}/ops-drill`,
@@ -357,6 +365,7 @@ function AdminShell({
       homeTo={`${base}/dashboard`}
       profileTo={`${base}/profile`}
       nav={nav}
+      headerExtra={<LocalePickers />}
       sidebarNavExtra={
         hasSecondary ? (
           <button

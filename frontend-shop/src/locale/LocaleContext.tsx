@@ -7,6 +7,13 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import {
+  filterLanguagesWithPacks,
+  formatPlatformMoney,
+  t as translate,
+  type MessageKey,
+  type TVars,
+} from '@halal-basket/web';
 import { api } from '../lib/api';
 
 export type PlatformCurrency = {
@@ -53,6 +60,7 @@ type LocaleContextValue = {
   setCurrencyCode: (code: string) => void;
   setLanguageCode: (code: string) => void;
   formatMoney: (amountInDefaultCurrency: number) => string;
+  t: (key: MessageKey | string, vars?: TVars) => string;
   refresh: () => Promise<void>;
 };
 
@@ -69,18 +77,32 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     const locale = await api<PublicLocale>('/platform/locale');
-    setData(locale);
+    const languages = filterLanguagesWithPacks(locale.languages);
+    const packLocale: PublicLocale = {
+      ...locale,
+      languages,
+      showLanguagePicker: languages.length > 1,
+      defaultLanguageCode: hasUiPackCode(
+        locale.defaultLanguageCode,
+        languages,
+      )
+        ? locale.defaultLanguageCode
+        : (languages.find((l) => l.isDefault)?.code ??
+          languages[0]?.code ??
+          'en'),
+    };
+    setData(packLocale);
 
     const storedCurrency = localStorage.getItem(STORAGE_CURRENCY);
     const storedLanguage = localStorage.getItem(STORAGE_LANGUAGE);
     const nextCurrency =
       (storedCurrency &&
-        locale.currencies.find((c) => c.code === storedCurrency)?.code) ||
-      locale.defaultCurrencyCode;
+        packLocale.currencies.find((c) => c.code === storedCurrency)?.code) ||
+      packLocale.defaultCurrencyCode;
     const nextLanguage =
       (storedLanguage &&
-        locale.languages.find((l) => l.code === storedLanguage)?.code) ||
-      locale.defaultLanguageCode;
+        packLocale.languages.find((l) => l.code === storedLanguage)?.code) ||
+      packLocale.defaultLanguageCode;
 
     setCurrencyCodeState(nextCurrency);
     setLanguageCodeState(nextLanguage);
@@ -135,20 +157,19 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
   );
 
   const formatMoney = useCallback(
-    (amountInDefaultCurrency: number) => {
-      const rate = Number(currency?.exchangeRate ?? 1);
-      const converted = amountInDefaultCurrency * rate;
-      const symbol = currency?.symbol ?? '€';
-      try {
-        return new Intl.NumberFormat(language?.code ?? 'en', {
-          style: 'currency',
-          currency: currency?.code ?? 'EUR',
-        }).format(converted);
-      } catch {
-        return `${symbol}${converted.toFixed(2)}`;
-      }
-    },
-    [currency, language],
+    (amountInDefaultCurrency: number) =>
+      formatPlatformMoney(amountInDefaultCurrency, {
+        currencyCode: currency?.code ?? 'EUR',
+        symbol: currency?.symbol ?? '€',
+        exchangeRate: currency?.exchangeRate ?? 1,
+      }),
+    [currency],
+  );
+
+  const t = useCallback(
+    (key: MessageKey | string, vars?: TVars) =>
+      translate(key, languageCode, vars),
+    [languageCode],
   );
 
   const value = useMemo<LocaleContextValue>(
@@ -165,6 +186,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
       setCurrencyCode,
       setLanguageCode,
       formatMoney,
+      t,
       refresh,
     }),
     [
@@ -177,6 +199,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
       setCurrencyCode,
       setLanguageCode,
       formatMoney,
+      t,
       refresh,
     ],
   );
@@ -184,6 +207,13 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
   return (
     <LocaleContext.Provider value={value}>{children}</LocaleContext.Provider>
   );
+}
+
+function hasUiPackCode(
+  code: string,
+  languages: PlatformLanguage[],
+): boolean {
+  return languages.some((l) => l.code === code);
 }
 
 export function useLocale() {

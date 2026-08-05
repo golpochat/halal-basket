@@ -6,6 +6,7 @@ import { SiteHeader } from '../../components/layout/SiteHeader';
 import { SiteFooter } from '../../components/layout/SiteFooter';
 import { LocalePickers } from '../../components/LocalePickers';
 import {
+  formatFulfillmentMode,
   formatOrderStatus,
   formatPaymentStatus,
   formatUserFacingError,
@@ -47,7 +48,7 @@ export function ConfirmationPage() {
 
 function ConfirmationInner() {
   const { session } = useAuth();
-  const { formatMoney } = useLocale();
+  const { t, languageCode, formatMoney } = useLocale();
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const [order, setOrder] = useState<Order | null>(null);
@@ -74,11 +75,11 @@ function ConfirmationInner() {
       if (paidFlag === '1') {
         setPayMsg(
           o.paymentStatus === 'paid'
-            ? 'Payment confirmed'
-            : 'Confirming payment with Stripe…',
+            ? t('confirmation.paymentConfirmed')
+            : t('confirmation.confirmingStripe'),
         );
       } else if (paidFlag === '0') {
-        setPayMsg('Checkout cancelled — you can pay when ready');
+        setPayMsg(t('confirmation.checkoutCancelled'));
       }
       return o;
     }
@@ -103,7 +104,7 @@ function ConfirmationInner() {
 
     boot.catch((e) => {
       if (!cancelled) {
-        const msg = formatUserFacingError(e, 'Could not load order');
+        const msg = formatUserFacingError(e, t('confirmation.loadFailed'));
         setError(msg);
         toastError(msg);
       }
@@ -131,7 +132,7 @@ function ConfirmationInner() {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [id, searchParams, token]);
+  }, [id, searchParams, token, t]);
 
   async function payNow() {
     if (!id) return;
@@ -156,17 +157,18 @@ function ConfirmationInner() {
           token,
           body: JSON.stringify({ paymentIntentId: intent.paymentIntentId }),
         });
-        setPayMsg('Payment confirmed');
-        toastSuccess('Payment confirmed');
+        const confirmed = t('confirmation.paymentConfirmed');
+        setPayMsg(confirmed);
+        toastSuccess(confirmed);
         setOrder(await load(id));
         return;
       }
 
-      const msg = 'Payment could not be started. Please try again.';
+      const msg = t('confirmation.payStartFailed');
       setError(msg);
       toastError(msg);
     } catch (e) {
-      const msg = formatUserFacingError(e, 'Payment failed');
+      const msg = formatUserFacingError(e, t('confirmation.payFailed'));
       setError(msg);
       toastError(msg);
     } finally {
@@ -185,12 +187,14 @@ function ConfirmationInner() {
       />
       <main className="mx-auto w-full max-w-lg flex-1 px-4 py-10 sm:px-6">
         <h1 className="font-display text-3xl font-semibold">
-          {paid ? 'Order confirmed' : 'Order placed'}
+          {paid
+            ? t('confirmation.titlePaid')
+            : t('confirmation.titlePlaced')}
         </h1>
         <p className="mt-2 text-[var(--hb-ink)]/65">
           {paid
-            ? "Thanks — we're preparing your basket."
-            : 'Pay to confirm your delivery. Your basket is held until payment completes.'}
+            ? t('confirmation.thanks')
+            : t('confirmation.payToConfirm')}
         </p>
         {error && (
           <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
@@ -205,92 +209,122 @@ function ConfirmationInner() {
         {order && (
           <div className="hb-surface mt-6 space-y-3 p-6 shadow-sm">
             <p className="text-xs text-[var(--hb-ink)]/50">
-              Order ref · {order.id.slice(0, 8).toUpperCase()}
+              {t('confirmation.orderRef', {
+                ref: order.id.slice(0, 8).toUpperCase(),
+              })}
             </p>
             <p>
-              Status: <strong>{formatOrderStatus(order.status)}</strong>
-            </p>
-            <p>
-              Payment:{' '}
+              {t('confirmation.status')}{' '}
               <strong>
-                {formatPaymentStatus(order.paymentStatus ?? 'pending')}
+                {formatOrderStatus(order.status, languageCode)}
               </strong>
             </p>
             <p>
-              Delivery:{' '}
-              {order.fulfillmentMode === 'scheduled_delivery'
-                ? 'Scheduled delivery'
-                : order.fulfillmentMode.replaceAll('_', ' ')}
+              {t('confirmation.payment')}{' '}
+              <strong>
+                {formatPaymentStatus(
+                  order.paymentStatus ?? 'pending',
+                  languageCode,
+                )}
+              </strong>
+            </p>
+            <p>
+              {t('confirmation.delivery')}{' '}
+              {formatFulfillmentMode(order.fulfillmentMode, languageCode)}
             </p>
             {order.subtotalAmount != null && (
               <div className="space-y-1 text-sm text-[var(--hb-ink)]/65">
                 <p className="flex justify-between gap-4">
-                  <span>Subtotal</span>
-                  <span>{formatMoney(Number(order.subtotalAmount))}</span>
+                  <span>{t('confirmation.subtotal')}</span>
+                  <span className="tabular-nums">
+                    {formatMoney(Number(order.subtotalAmount))}
+                  </span>
                 </p>
                 {Number(order.discountAmount ?? 0) > 0 && (
                   <p className="flex justify-between gap-4 text-[var(--hb-green)]">
                     <span>
-                      Discount
+                      {t('confirmation.discount')}
                       {order.couponCode ? ` (${order.couponCode})` : ''}
                     </span>
-                    <span>−{formatMoney(Number(order.discountAmount))}</span>
+                    <span className="tabular-nums">
+                      −{formatMoney(Number(order.discountAmount))}
+                    </span>
                   </p>
                 )}
                 {order.deliveryFeeAmount != null && (
                   <p className="flex justify-between gap-4">
-                    <span>Delivery</span>
-                    <span>
+                    <span>{t('confirmation.deliveryFee')}</span>
+                    <span className="tabular-nums">
                       {Number(order.deliveryFeeAmount) === 0
-                        ? 'Free'
+                        ? t('confirmation.free')
                         : formatMoney(Number(order.deliveryFeeAmount))}
                     </span>
                   </p>
                 )}
+                <p className="flex justify-between gap-4 font-semibold text-[var(--hb-ink)]">
+                  <span>{t('confirmation.total')}</span>
+                  <span className="tabular-nums">
+                    {formatMoney(Number(order.totalAmount))}
+                  </span>
+                </p>
               </div>
             )}
-            <p className="font-display text-2xl">
-              {formatMoney(Number(order.totalAmount))}
-            </p>
+            {order.subtotalAmount == null && (
+              <p className="font-display text-2xl tabular-nums">
+                {formatMoney(Number(order.totalAmount))}
+              </p>
+            )}
             {order.paymentStatus !== 'paid' && (
               <button
                 disabled={paying}
                 onClick={() => void payNow()}
                 className="hb-btn hb-btn-primary w-full py-3"
               >
-                {paying ? 'Processing…' : 'Pay now'}
+                {paying
+                  ? t('confirmation.processing')
+                  : t('confirmation.payNow')}
               </button>
             )}
             <div className="space-y-2 border-t border-[rgba(26,92,58,0.1)] pt-3">
               {order.fulfillments.length > 1 && (
                 <p className="text-xs text-[var(--hb-ink)]/55">
-                  This order is split across {order.fulfillments.length}{' '}
-                  deliveries from Halal Basket.
+                  {t('confirmation.splitNote', {
+                    count: order.fulfillments.length,
+                  })}
                 </p>
               )}
               {order.fulfillments.map((f, index) => (
                 <div key={f.id} className="text-sm">
                   <p>
                     {order.fulfillments.length > 1
-                      ? `Part ${index + 1} of ${order.fulfillments.length}`
+                      ? t('confirmation.partOf', {
+                          part: index + 1,
+                          total: order.fulfillments.length,
+                        })
                       : 'Halal Basket'}{' '}
-                    · <StatusBadge status={f.status} />
+                    · <StatusBadge status={f.status} lang={languageCode} />
                   </p>
                   {order.fulfillmentMode === 'pickup' && f.shop?.address && (
                     <p className="mt-1 text-[var(--hb-ink)]/65">
-                      Pickup location: {f.shop.address}
+                      {t('confirmation.pickupLocation', {
+                        address: f.shop.address,
+                      })}
                     </p>
                   )}
                   {f.estimatedDeliveryAt && (
                     <p className="mt-1 text-[var(--hb-ink)]/65">
-                      ETA:{' '}
-                      {new Date(f.estimatedDeliveryAt).toLocaleString()}
+                      {t('confirmation.eta')}{' '}
+                      {new Date(f.estimatedDeliveryAt).toLocaleString(
+                        languageCode,
+                      )}
                     </p>
                   )}
                   {f.deliveryDate && (
                     <p className="mt-1 text-[var(--hb-ink)]/65">
-                      Delivery:{' '}
-                      {new Date(f.deliveryDate).toLocaleDateString()}
+                      {t('confirmation.deliveryDate')}{' '}
+                      {new Date(f.deliveryDate).toLocaleDateString(
+                        languageCode,
+                      )}
                     </p>
                   )}
                 </div>
@@ -299,8 +333,12 @@ function ConfirmationInner() {
           </div>
         )}
         <div className="mt-6 flex gap-4 text-sm font-medium text-[var(--hb-green)]">
-          <Link to={`/customer/orders/${id}`}>Track status →</Link>
-          <Link to="/">Continue shopping</Link>
+          <Link to={`/customer/orders/${id}`}>
+            {paid
+              ? t('confirmation.trackStatus')
+              : t('confirmation.viewOrder')}
+          </Link>
+          <Link to="/">{t('confirmation.continueShopping')}</Link>
         </div>
       </main>
       <SiteFooter />

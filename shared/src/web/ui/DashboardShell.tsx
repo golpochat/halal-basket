@@ -33,6 +33,8 @@ export type DashboardShellProps = {
   nav: DashboardNavItem[];
   /** Optional controls rendered under sidebar nav (e.g. toggles). */
   sidebarNavExtra?: ReactNode;
+  /** Optional controls in the header before the account menu (e.g. locale pickers). */
+  headerExtra?: ReactNode;
   title?: string;
   userLabel?: string | null;
   userRoleLabel?: string | null;
@@ -42,6 +44,8 @@ export type DashboardShellProps = {
   compact?: boolean;
   footerNote?: string;
   storageKey?: string;
+  signOutLabel?: string;
+  myProfileLabel?: string;
 };
 
 const TitleCtx = createContext<(title: string) => void>(() => undefined);
@@ -74,6 +78,7 @@ export function DashboardShell({
   profileTo,
   nav,
   sidebarNavExtra,
+  headerExtra,
   title: titleProp,
   userLabel,
   userRoleLabel,
@@ -83,6 +88,8 @@ export function DashboardShell({
   compact = false,
   footerNote = `© ${new Date().getFullYear()} Halal Basket. All rights reserved.`,
   storageKey = 'hb-dash-sidebar-collapsed',
+  signOutLabel,
+  myProfileLabel,
 }: DashboardShellProps) {
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(() => {
@@ -238,12 +245,15 @@ export function DashboardShell({
               </div>
 
               <div className="hb-dashboard__header-actions">
+                {headerExtra}
                 <AccountMenu
                   email={userLabel}
                   roleLabel={userRoleLabel}
                   avatarUrl={avatarUrl}
                   profileTo={profileTo}
                   onLogout={onLogout}
+                  signOutLabel={signOutLabel}
+                  myProfileLabel={myProfileLabel}
                 />
               </div>
             </div>

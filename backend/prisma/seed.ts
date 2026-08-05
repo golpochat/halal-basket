@@ -3,8 +3,10 @@ import {
   ShopKind,
   UserRole,
   Weekday,
+  Prisma,
 } from "./generated/client";
 import * as bcrypt from "bcrypt";
+import { CULTURAL_PRODUCT_BANK } from "./cultural-product-bank";
 
 const prisma = new PrismaClient();
 
@@ -202,37 +204,26 @@ async function main() {
     },
   });
 
-  const sampleProducts = [
-    {
-      name: "Basmati Rice 5kg",
-      slug: "basmati-rice-5kg",
-      barcode: "8901001000001",
-      sku: "SKU-RICE-5",
-      description: "Premium long grain",
-      category: "Pantry",
-      price: 12.99,
-    },
-    {
-      name: "Chicken Thighs 1kg",
-      slug: "chicken-thighs-1kg",
-      barcode: "8901001000002",
-      sku: "SKU-CHICK-1",
-      description: "Halal chicken thighs",
-      category: "Meat & Poultry",
-      price: 8.5,
-    },
-    {
-      name: "Olive Oil 1L",
-      slug: "olive-oil-1l",
-      barcode: "8901001000003",
-      sku: "SKU-OIL-1",
-      description: "Extra virgin",
-      category: "Pantry",
-      price: 6.75,
-    },
-  ];
+  // Cultural Product Bank (Option 1: one SKU per pack/format) + shop overlays
+  // Ensure product photos are available under /uploads/products
+  {
+    const fs = await import('fs');
+    const path = await import('path');
+    const srcDir = path.join(__dirname, 'product-images');
+    const destDir = path.join(process.cwd(), 'uploads', 'products');
+    fs.mkdirSync(destDir, { recursive: true });
+    if (fs.existsSync(srcDir)) {
+      for (const file of fs.readdirSync(srcDir)) {
+        if (!/\.(jpe?g|png|webp)$/i.test(file)) continue;
+        fs.copyFileSync(
+          path.join(srcDir, file),
+          path.join(destDir, file),
+        );
+      }
+    }
+  }
 
-  for (const row of sampleProducts) {
+  for (const row of CULTURAL_PRODUCT_BANK) {
     const catSlug = row.category
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
@@ -243,6 +234,7 @@ async function main() {
       create: { name: row.category, slug: catSlug },
     });
 
+    const tagsJson = row.tags as unknown as Prisma.InputJsonValue;
     const product = await prisma.product.upsert({
       where: { barcode: row.barcode },
       update: {
@@ -250,6 +242,8 @@ async function main() {
         slug: row.slug,
         description: row.description,
         sku: row.sku,
+        imageUrl: row.imageUrl,
+        tags: tagsJson,
         categoryId: category.id,
         isActive: true,
         qrCode: `HB-QR-${row.barcode}`,
@@ -260,6 +254,8 @@ async function main() {
         description: row.description,
         sku: row.sku,
         barcode: row.barcode,
+        imageUrl: row.imageUrl,
+        tags: tagsJson,
         qrCode: `HB-QR-${row.barcode}`,
         categoryId: category.id,
         isActive: true,

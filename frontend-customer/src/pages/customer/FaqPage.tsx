@@ -69,7 +69,7 @@ export function FaqPage() {
     },
     {
       q: 'Are products halal?',
-      a: 'We list products from participating local shops. Prefer items you trust; platform trust lines emphasise verified stock rather than a single warehouse claim.',
+      a: 'Yes. Everything on Halal Basket is Halal — that is the platform standard, not a per-product claim. We list stock from participating local shops that meet that requirement.',
     },
     {
       q: 'Do you deliver outside Dublin pilot areas?',

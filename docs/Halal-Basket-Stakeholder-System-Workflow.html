@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Halal Basket — Stakeholder System Workflow</title>
+  <style>
+    :root {
+      --green: #1B5E3B;
+      --green-soft: #E8F2EC;
+      --green-mid: #3D7A5A;
+      --ink: #243028;
+      --muted: #5A665C;
+      --line: #C5D6CB;
+      --cream: #F4F8F5;
+      --white: #ffffff;
+      --warn-bg: #FFF8EF;
+      --warn-border: #E6C48A;
+      --ok-bg: #EEF7F1;
+      --ok-border: #9CC9AE;
+      --font: "Segoe UI", "Candara", "Calibri", system-ui, sans-serif;
+      --display: "Georgia", "Palatino Linotype", "Book Antiqua", serif;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: var(--font);
+      color: var(--ink);
+      background:
+        radial-gradient(1200px 500px at 10% -10%, #d9eee2 0%, transparent 55%),
+        radial-gradient(900px 400px at 100% 0%, #e7f1ea 0%, transparent 50%),
+        linear-gradient(180deg, #f7fbf8 0%, #eef3f0 100%);
+      line-height: 1.5;
+    }
+    .wrap { max-width: 1080px; margin: 0 auto; padding: 28px 20px 80px; }
+    header.hero {
+      text-align: center;
+      padding: 36px 16px 28px;
+      margin-bottom: 28px;
+      border-bottom: 1px solid var(--line);
+    }
+    header.hero .brand {
+      font-family: var(--display);
+      font-size: clamp(2rem, 4vw, 2.75rem);
+      color: var(--green);
+      margin: 0 0 6px;
+      letter-spacing: -0.02em;
+      animation: rise 0.7s ease both;
+    }
+    header.hero h1 {
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: var(--muted);
+      margin: 0 0 10px;
+      animation: rise 0.7s ease 0.08s both;
+    }
+    header.hero p {
+      margin: 0 auto;
+      max-width: 42rem;
+      color: var(--muted);
+      font-size: 0.98rem;
+      animation: rise 0.7s ease 0.14s both;
+    }
+    nav.toc {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      margin: 22px 0 8px;
+      animation: rise 0.7s ease 0.2s both;
+    }
+    nav.toc a {
+      text-decoration: none;
+      color: var(--green);
+      background: var(--white);
+      border: 1px solid var(--line);
+      padding: 6px 12px;
+      font-size: 0.85rem;
+      border-radius: 6px;
+      transition: background 0.2s, transform 0.2s;
+    }
+    nav.toc a:hover { background: var(--green-soft); transform: translateY(-1px); }
+    section.block {
+      background: var(--white);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 22px 22px 18px;
+      margin: 18px 0;
+      box-shadow: 0 8px 24px rgba(27, 94, 59, 0.05);
+      animation: rise 0.6s ease both;
+    }
+    section.block h2 {
+      font-family: var(--display);
+      color: var(--green);
+      margin: 0 0 12px;
+      font-size: 1.35rem;
+      font-weight: 600;
+    }
+    section.block h3 {
+      color: var(--green-mid);
+      margin: 16px 0 8px;
+      font-size: 1.05rem;
+    }
+    section.block p { color: var(--muted); margin: 0 0 12px; }
+    .figure {
+      margin: 8px 0 6px;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      background: var(--cream);
+    }
+    .figure img {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+    .caption {
+      font-size: 0.8rem;
+      color: var(--muted);
+      text-align: center;
+      margin: 6px 0 14px;
+    }
+    /* Interactive flow strip */
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 10px;
+      margin: 12px 0 8px;
+    }
+    .flow-step {
+      background: linear-gradient(165deg, #f8fcf9, var(--green-soft));
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px 12px;
+      text-align: center;
+      position: relative;
+      transition: transform 0.25s ease, box-shadow 0.25s ease;
+      cursor: default;
+    }
+    .flow-step:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 10px 20px rgba(27, 94, 59, 0.12);
+    }
+    .flow-step .num {
+      width: 28px; height: 28px; line-height: 28px;
+      margin: 0 auto 8px;
+      border-radius: 50%;
+      background: var(--green);
+      color: white;
+      font-weight: 700;
+      font-size: 0.85rem;
+    }
+    .flow-step strong {
+      display: block;
+      color: var(--green);
+      font-size: 0.92rem;
+      margin-bottom: 4px;
+    }
+    .flow-step span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.78rem;
+      line-height: 1.35;
+    }
+    @media (max-width: 800px) {
+      .flow { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 480px) {
+      .flow { grid-template-columns: 1fr; }
+    }
+    .roles {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      margin-top: 8px;
+    }
+    .role-pill {
+      background: var(--cream);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px;
+      transition: transform 0.2s;
+    }
+    .role-pill:hover { transform: translateY(-2px); }
+    .role-pill h4 {
+      margin: 0 0 4px;
+      color: var(--green);
+      font-size: 1rem;
+    }
+    .role-pill p { margin: 0; font-size: 0.85rem; }
+    .role-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+    @media (min-width: 720px) {
+      .role-grid { grid-template-columns: 1fr 1fr; }
+    }
+    .role-card {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px 16px;
+      background: var(--cream);
+    }
+    .role-card h3 { margin-top: 0; }
+    .role-card ol {
+      margin: 0;
+      padding-left: 1.2rem;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+    .role-card li { margin: 4px 0; }
+    .chain {
+      font-family: var(--font);
+      background: var(--green);
+      color: #f4fff8;
+      border-radius: 12px;
+      padding: 16px 18px;
+      font-size: 0.95rem;
+      line-height: 1.55;
+      letter-spacing: 0.01em;
+    }
+    .split {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+    @media (min-width: 720px) {
+      .split { grid-template-columns: 1fr 1fr; }
+    }
+    .panel {
+      border-radius: 12px;
+      padding: 14px 16px;
+      border: 1px solid;
+    }
+    .panel.ok { background: var(--ok-bg); border-color: var(--ok-border); }
+    .panel.warn { background: var(--warn-bg); border-color: var(--warn-border); }
+    .panel h3 { margin: 0 0 8px; color: var(--ink); }
+    .panel ul { margin: 0; padding-left: 1.15rem; color: var(--muted); font-size: 0.9rem; }
+    .panel li { margin: 5px 0; }
+    table.glossary {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+    table.glossary th, table.glossary td {
+      border-bottom: 1px solid var(--line);
+      padding: 10px 8px;
+      vertical-align: top;
+      text-align: left;
+    }
+    table.glossary th {
+      width: 28%;
+      color: var(--green);
+      font-weight: 700;
+    }
+    table.glossary tr:nth-child(even) td,
+    table.glossary tr:nth-child(even) th {
+      background: var(--cream);
+    }
+    footer {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.85rem;
+      margin-top: 28px;
+    }
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @media print {
+      body { background: white; }
+      nav.toc { display: none; }
+      section.block { box-shadow: none; break-inside: avoid; }
+      .flow-step:hover { transform: none; box-shadow: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="hero">
+      <p class="brand">Halal Basket</p>
+      <h1>Stakeholder System Workflow</h1>
+      <p>A clear picture of how the platform works today — who uses it, how an order moves, and what every term means.</p>
+      <nav class="toc">
+        <a href="#who">Who uses it</a>
+        <a href="#flow">Order flow</a>
+        <a href="#roles">Role steps</a>
+        <a href="#status">Pilot status</a>
+        <a href="#glossary">Glossary</a>
+      </nav>
+    </header>
+
+    <section class="block" id="what">
+      <h2>What Halal Basket is</h2>
+      <p>Halal Basket is a grocery ordering and delivery platform. Customers shop one branded catalogue. Partner shops prepare the goods. Drivers deliver. Operations staff support orders, catalogue, and customer care — including WhatsApp when enabled.</p>
+    </section>
+
+    <section class="block" id="who">
+      <h2>Who uses the system</h2>
+      <div class="figure"><img src="stakeholder-assets/hb-portals.png" alt="Who uses Halal Basket — four portals plus WhatsApp channel" /></div>
+      <p class="caption">Four apps work together. WhatsApp is a messaging channel, not a separate login role.</p>
+      <div class="roles">
+        <div class="role-pill"><h4>Customer</h4><p>Customer App — browse, order, pay, track</p></div>
+        <div class="role-pill"><h4>Shop staff</h4><p>Shop Portal — prepare, stock, assign driver</p></div>
+        <div class="role-pill"><h4>Driver</h4><p>Driver App — deliver assigned orders</p></div>
+        <div class="role-pill"><h4>Admin / Ops</h4><p>Admin Console — support, settings, WhatsApp inbox</p></div>
+      </div>
+    </section>
+
+    <section class="block" id="flow">
+      <h2>How an order flows</h2>
+      <div class="flow" aria-label="Order flow steps">
+        <div class="flow-step"><div class="num">1</div><strong>Browse</strong><span>Catalogue by delivery area</span></div>
+        <div class="flow-step"><div class="num">2</div><strong>Checkout</strong><span>Scheduled delivery + place order</span></div>
+        <div class="flow-step"><div class="num">3</div><strong>Pay</strong><span>Confirmation screen payment</span></div>
+        <div class="flow-step"><div class="num">4</div><strong>Prepare</strong><span>Shop fulfillment + assign driver</span></div>
+        <div class="flow-step"><div class="num">5</div><strong>Deliver</strong><span>Driver completes; ops if needed</span></div>
+      </div>
+      <div class="figure" style="margin-top:16px"><img src="stakeholder-assets/hb-order-flow.png" alt="End-to-end order flow diagram" /></div>
+      <p class="caption">Happy path from customer browse through to delivery and optional admin support.</p>
+      <div class="figure"><img src="stakeholder-assets/hb-swimlanes.png" alt="Role swimlane responsibilities" /></div>
+      <p class="caption">One order is a relay across Customer → Shop → Driver, with Admin on support.</p>
+      <div class="chain">
+        Register → Catalogue (choose area) → Basket → Checkout (scheduled delivery) → Place order → Pay → Shop prepares &amp; assigns driver → Driver delivers → Ops available for support
+      </div>
+      <p style="margin-top:12px">Optional side path: WhatsApp opt-in for updates, or WhatsApp catalogue cart creating the same order plus a pay link.</p>
+    </section>
+
+    <section class="block" id="roles">
+      <h2>Role workflows (step by step)</h2>
+      <div class="role-grid">
+        <section class="role-card">
+          <h3>Customer</h3>
+          <ol><li>Register or sign in on the Customer App.</li><li>Choose a delivery area and browse the catalogue.</li><li>Add items to the basket (favourites optional).</li><li>Checkout: confirm basket → delivery details → place order.</li><li>Pay on the confirmation screen.</li><li>Track the order under My orders; manage profile, addresses, and favourites.</li></ol>
+        </section>
+        <section class="role-card">
+          <h3>Shop (partner)</h3>
+          <ol><li>Open the Shop Portal and review new fulfillments.</li><li>Update status: preparing → ready → out for delivery.</li><li>Assign a driver when ready for delivery.</li><li>Maintain product price and stock quantity.</li><li>Use the prep view to plan by delivery date.</li></ol>
+        </section>
+        <section class="role-card">
+          <h3>Driver</h3>
+          <ol><li>Open the Driver App and review today’s assigned jobs.</li><li>Open an order, complete the delivery steps, and mark progress.</li><li>Submit feedback / ratings where prompted.</li><li>Review history of completed work.</li></ol>
+        </section>
+        <section class="role-card">
+          <h3>Admin / Operations</h3>
+          <ol><li>Look up orders, totals, coupons, and fees.</li><li>Handle refunds, complaints, and customer risk/block actions when needed.</li><li>Manage shops, drivers, staff users, and permissions.</li><li>Maintain catalogue, featured categories, delivery fees, promotions, branding.</li><li>Publish legal pages; use GDPR tools when required.</li><li>Monitor WhatsApp care inbox and catalogue sync (when WhatsApp is enabled).</li></ol>
+        </section>
+        <section class="role-card">
+          <h3>WhatsApp (optional channel)</h3>
+          <ol><li>Customer can opt in at checkout for order notifications.</li><li>Keywords and inbox support help (status, pay link, order help).</li><li>Support can send assist or shop links from the admin inbox.</li><li>Customers can shop the WhatsApp catalogue; cart can create a Halal Basket order plus pay link.</li></ol>
+        </section></div>
+    </section>
+
+    <section class="block" id="status">
+      <h2>What is live for pilot vs not yet</h2>
+      <div class="split">
+        <div class="panel ok">
+          <h3>Ready to demonstrate</h3>
+          <ul><li>Customer browse → scheduled delivery order → pay → shop prepare → driver deliver → ops support</li><li>Four portals: Customer, Shop, Driver, Admin</li><li>Delivery areas &amp; calendar (e.g. Lucan, Swords, Tallaght)</li><li>Coupons / promotions, favourites, multi-language string packs (when languages are published)</li><li>WhatsApp care + catalogue commerce in Meta sandbox / test setup</li></ul>
+        </div>
+        <div class="panel warn">
+          <h3>Not production-live yet</h3>
+          <ul><li>Production / public staging website cutover (still local pilot-ready)</li><li>Pickup and realtime delivery in the customer checkout screen (API exists; UI is scheduled-only today)</li><li>Warehouse-led fulfillment published to customers</li><li>Multi-shop split orders in production (feature exists, default off)</li><li>WhatsApp on a live production business number (sandbox/test today)</li></ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="block" id="glossary">
+      <h2>Glossary of terms</h2>
+      <p>Every important term used in this overview, in one place.</p>
+      <table class="glossary">
+        <thead><tr><th>Term</th><th>Meaning in Halal Basket</th></tr></thead>
+        <tbody><tr><th>Halal Basket</th><td>The platform brand customers see. One catalogue experience, not separate shop storefronts.</td></tr><tr><th>Customer App</th><td>Where shoppers browse, add items, check out, pay, and track orders.</td></tr><tr><th>Shop Portal</th><td>Where a partner shop prepares orders, updates stock/prices, and assigns drivers.</td></tr><tr><th>Driver App</th><td>Where drivers see assigned deliveries and mark progress through to delivered.</td></tr><tr><th>Admin Console</th><td>Where operations and platform teams manage orders, users, catalogue, fees, legal, and WhatsApp.</td></tr><tr><th>Catalogue</th><td>The shared product listing customers browse. Availability depends on the selected delivery area.</td></tr><tr><th>Basket / Cart</th><td>The list of items the customer intends to buy, before the order is placed.</td></tr><tr><th>Delivery area</th><td>A named place we deliver to (for example Lucan, Swords, Tallaght). Affects stock and delivery day.</td></tr><tr><th>Delivery calendar</th><td>Rules that map each delivery area to the weekday(s) when deliveries run.</td></tr><tr><th>Scheduled delivery</th><td>The live checkout option today: customer orders ahead for a planned delivery day.</td></tr><tr><th>Order</th><td>The customer’s purchase record (items, totals, payment, delivery details).</td></tr><tr><th>Fulfillment</th><td>The shop’s part of an order — prepare, ready, out for delivery, delivered.</td></tr><tr><th>Stock hold</th><td>A short reservation of stock while checkout completes, so items are not double-sold.</td></tr><tr><th>Payment</th><td>Customer pays after placing the order (mock pay in pilot, or Stripe Checkout when configured).</td></tr><tr><th>Coupon / Promo</th><td>Discount codes or cart promotions applied at checkout (for example HALAL10, WELCOME5).</td></tr><tr><th>Partner shop</th><td>A store that stocks and prepares items for Halal Basket orders.</td></tr><tr><th>Warehouse</th><td>A central stock location type in the system; not published for customer fulfillment in the current pilot.</td></tr><tr><th>WhatsApp channel</th><td>Optional messaging path: order updates, customer care inbox, and catalogue cart → Halal Basket order.</td></tr><tr><th>Care inbox</th><td>Admin view of WhatsApp conversations so support can reply and help customers.</td></tr><tr><th>Assist link</th><td>A secure short-lived link that helps a customer continue checkout with support guidance.</td></tr><tr><th>Opt-in</th><td>Customer agrees to receive WhatsApp order updates and share a phone number.</td></tr><tr><th>RBAC / Permissions</th><td>Staff access controls — who can see ops, catalogue, GDPR, WhatsApp, and so on.</td></tr><tr><th>Platform vs Work</th><td>Admin navigation: Platform = settings/governance; Work = day-to-day operations.</td></tr><tr><th>GDPR tools</th><td>Admin privacy tools to search, export, or erase customer data under policy constraints.</td></tr><tr><th>Legal documents</th><td>Published policies (privacy, terms, cookies, refunds) shown to customers.</td></tr><tr><th>Favourites</th><td>Products a signed-in customer has hearted for quick re-find.</td></tr><tr><th>Live order status</th><td>Customer order tracking updates while the order moves through shop and driver steps.</td></tr></tbody>
+      </table>
+    </section>
+
+    <footer>
+      Halal Basket · Stakeholder pack · Open this file for screen-share; use the DOCX/PDF as the handout.
+    </footer>
+  </div>
+</body>
+</html>

@@ -13,6 +13,7 @@ import { RegisterCustomerDto } from './dto/register-customer.dto';
 import { LoginDto } from './dto/login.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { MetricsService } from '../../common/metrics.service';
+import { normalizeE164 } from '../whatsapp/phone';
 
 @Injectable()
 export class AuthService {
@@ -152,16 +153,58 @@ export class AuthService {
       if (taken) throw new ConflictException('Email already in use');
     }
 
-    if (dto.phone && dto.phone !== user.phone) {
-      const taken = await this.prisma.user.findFirst({
-        where: { phone: dto.phone, NOT: { id: user.id } },
-      });
-      if (taken) throw new ConflictException('Phone already in use');
+    if (dto.phone !== undefined && dto.phone.trim()) {
+      const normalized = normalizeE164(dto.phone);
+      if (!normalized) {
+        throw new BadRequestException(
+          'Phone must be in international format (E.164), e.g. +353871234567',
+        );
+      }
+      if (normalized !== user.phone) {
+        const taken = await this.prisma.user.findFirst({
+          where: { phone: normalized, NOT: { id: user.id } },
+        });
+        if (taken) throw new ConflictException('Phone already in use');
+      }
+    }
+
+    if (dto.whatsappOptIn === true) {
+      if (!user.customer) {
+        throw new BadRequestException(
+          'Only customer accounts can enable WhatsApp updates',
+        );
+      }
+      const phoneForOptIn =
+        dto.phone !== undefined
+          ? normalizeE164(dto.phone)
+          : normalizeE164(user.phone);
+      if (!phoneForOptIn) {
+        throw new BadRequestException(
+          'Add a valid international phone number to enable WhatsApp updates',
+        );
+      }
     }
 
     const nextEmail = dto.email?.toLowerCase() ?? user.email;
-    const nextPhone =
-      dto.phone === undefined ? user.phone : dto.phone.trim() || null;
+    let nextPhone: string | null;
+    if (dto.phone === undefined) {
+      nextPhone = user.phone;
+    } else if (!dto.phone.trim()) {
+      nextPhone = null;
+    } else {
+      nextPhone = normalizeE164(dto.phone);
+    }
+
+    const optInNext =
+      dto.whatsappOptIn !== undefined
+        ? dto.whatsappOptIn
+        : Boolean(user.customer?.whatsappOptIn);
+    if (user.customer && optInNext && !nextPhone) {
+      throw new BadRequestException(
+        'Add a valid international phone number to enable WhatsApp updates',
+      );
+    }
+
     const nextAvatar =
       dto.avatarUrl === undefined
         ? undefined
@@ -195,7 +238,17 @@ export class AuthService {
         if (user.customer) {
           await tx.customer.update({
             where: { id: user.customer.id },
-            data: { name: dto.name.trim() },
+            data: {
+              name: dto.name.trim(),
+              ...(dto.whatsappOptIn !== undefined
+                ? {
+                    whatsappOptIn: dto.whatsappOptIn,
+                    whatsappOptInAt: dto.whatsappOptIn
+                      ? new Date()
+                      : null,
+                  }
+                : {}),
+            },
           });
         }
         if (user.driver) {
@@ -204,7 +257,7 @@ export class AuthService {
             data: {
               name: dto.name.trim(),
               ...(dto.phone !== undefined
-                ? { phone: dto.phone.trim() || null }
+                ? { phone: nextPhone }
                 : {}),
             },
           });
@@ -212,7 +265,17 @@ export class AuthService {
       } else if (user.driver && dto.phone !== undefined) {
         await tx.driver.update({
           where: { id: user.driver.id },
-          data: { phone: dto.phone.trim() || null },
+          data: { phone: nextPhone },
+        });
+      }
+
+      if (user.customer && dto.whatsappOptIn !== undefined && !dto.name?.trim()) {
+        await tx.customer.update({
+          where: { id: user.customer.id },
+          data: {
+            whatsappOptIn: dto.whatsappOptIn,
+            whatsappOptInAt: dto.whatsappOptIn ? new Date() : null,
+          },
         });
       }
 
@@ -347,7 +410,11 @@ export class AuthService {
     phone: string | null;
     avatarUrl?: string | null;
     role: UserRole;
-    customer: { name: string; addressList?: unknown } | null;
+    customer: {
+      name: string;
+      addressList?: unknown;
+      whatsappOptIn?: boolean;
+    } | null;
     driver: { name: string; phone: string | null } | null;
     shopUsers: Array<{ shop: { name: string } }>;
   }) {
@@ -366,6 +433,9 @@ export class AuthService {
       canEditName: Boolean(user.customer || user.driver),
       addressList: user.customer
         ? this.readAddressList(user.customer.addressList)
+        : undefined,
+      whatsappOptIn: user.customer
+        ? Boolean(user.customer.whatsappOptIn)
         : undefined,
     };
   }
@@ -447,5 +517,28 @@ export class AuthService {
         avatarUrl: avatarUrl ?? null,
       },
     };
+  }
+
+  /** Issue a normal access token for an existing user (WhatsApp assist deep link). */
+  async issueSessionForUserId(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        avatarUrl: true,
+        isActive: true,
+      },
+    });
+    if (!user || !user.isActive) {
+      throw new UnauthorizedException('Account unavailable');
+    }
+    return this.tokenResponse(
+      user.id,
+      user.email,
+      user.role,
+      user.avatarUrl,
+    );
   }
 }

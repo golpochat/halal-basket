@@ -30,6 +30,7 @@ import { AdminOpsDrillPage } from './pages/admin/OpsDrillPage';
 import { AdminProfilePage } from './pages/admin/ProfilePage';
 import { AdminFeaturedCategoriesPage } from './pages/admin/FeaturedCategoriesPage';
 import { AdminLegalPagesPage } from './pages/admin/LegalPagesPage';
+import { AdminWhatsappInboxPage } from './pages/admin/WhatsappInboxPage';
 import { useAuth } from './auth/AuthContext';
 import { homeForRole } from './lib/api';
 
@@ -80,6 +81,7 @@ function adminChildRoutes() {
       />
       <Route path="catalogue" element={<AdminCataloguePage />} />
       <Route path="gdpr" element={<AdminGdprPage />} />
+      <Route path="whatsapp" element={<AdminWhatsappInboxPage />} />
       <Route path="ops-drill" element={<AdminOpsDrillPage />} />
     </>
   );

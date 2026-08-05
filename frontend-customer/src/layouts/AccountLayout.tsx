@@ -1,17 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { DashboardShell, type DashboardNavItem } from '@halal-basket/web';
 import { RequireAuth, RequireRole } from '../auth/guards';
 import { useAuth } from '../auth/AuthContext';
 import { BrandLogo } from '../components/brand/BrandLogo';
-
-const accountNav: DashboardNavItem[] = [
-  { to: '/customer/dashboard', label: 'Dashboard', end: true, icon: 'home' },
-  { to: '/customer/orders', label: 'My orders', icon: 'package' },
-  { to: '/customer/favourites', label: 'Favourites', icon: 'heart' },
-  { to: '/customer/addresses', label: 'Addresses', icon: 'location' },
-  { to: '/customer/profile', label: 'Profile', icon: 'account' },
-  { to: '/', label: 'Back to shop', icon: 'store' },
-];
+import { LocalePickers } from '../components/LocalePickers';
+import { useLocale } from '../locale/LocaleContext';
 
 export function AccountLayout() {
   return (
@@ -25,6 +18,33 @@ export function AccountLayout() {
 
 function AccountShell() {
   const { session, logout } = useAuth();
+  const { t } = useLocale();
+  const year = new Date().getFullYear();
+
+  const accountNav: DashboardNavItem[] = useMemo(
+    () => [
+      {
+        to: '/customer/dashboard',
+        label: t('nav.dashboard'),
+        end: true,
+        icon: 'home',
+      },
+      { to: '/customer/orders', label: t('nav.orders'), icon: 'package' },
+      {
+        to: '/customer/favourites',
+        label: t('nav.favourites'),
+        icon: 'heart',
+      },
+      {
+        to: '/customer/addresses',
+        label: t('nav.addresses'),
+        icon: 'location',
+      },
+      { to: '/customer/profile', label: t('nav.profile'), icon: 'account' },
+      { to: '/', label: t('nav.backToShop'), icon: 'store' },
+    ],
+    [t],
+  );
 
   useEffect(() => {
     document.documentElement.setAttribute('data-role', 'customer');
@@ -37,16 +57,19 @@ function AccountShell() {
     <DashboardShell
       brand={<BrandLogo size="sm" />}
       brandCollapsed={<BrandLogo size="sm" showWordmark={false} />}
-      brandLabel="Customer"
+      brandLabel={t('nav.customer')}
       homeTo="/customer/dashboard"
       profileTo="/customer/profile"
       nav={accountNav}
+      headerExtra={<LocalePickers />}
       userLabel={session?.user.email ?? null}
-      userRoleLabel="Customer"
+      userRoleLabel={t('nav.customer')}
       avatarUrl={session?.user.avatarUrl}
       onLogout={logout}
       storageKey="hb-dash-collapsed-customer"
-      footerNote={`© ${new Date().getFullYear()} Halal Basket. All rights reserved.`}
+      footerNote={t('nav.rightsReserved', { year })}
+      signOutLabel={t('chrome.signOut')}
+      myProfileLabel={t('nav.myProfile')}
     />
   );
 }

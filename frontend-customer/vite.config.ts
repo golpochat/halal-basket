@@ -15,6 +15,9 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    host: true,
+    // Cloudflare quick tunnels send Host: *.trycloudflare.com
+    allowedHosts: ['.trycloudflare.com', 'localhost'],
     fs: { allow: [path.resolve(root, '..')] },
   },
 });

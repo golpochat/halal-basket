@@ -43,7 +43,16 @@ function roundMoney(n: number) {
   return Math.round(n * 100) / 100;
 }
 
+/** Keep EUR formatting local — avoids circular import via @halal-basket/web. */
 export function formatEuroFee(amount: number) {
   if (amount === 0) return 'Free';
-  return `€${amount.toFixed(2)}`;
+  try {
+    return new Intl.NumberFormat('en-IE', {
+      style: 'currency',
+      currency: 'EUR',
+      numberingSystem: 'latn',
+    }).format(amount);
+  } catch {
+    return `€${amount.toFixed(2)}`;
+  }
 }

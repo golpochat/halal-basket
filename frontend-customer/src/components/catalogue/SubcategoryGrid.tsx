@@ -1,4 +1,9 @@
-import { CategoryIconBadge, type CategoryNode } from '@halal-basket/web';
+import {
+  CategoryIconBadge,
+  categoryDisplayName,
+  type CategoryNode,
+} from '@halal-basket/web';
+import { useLocale } from '../../locale/LocaleContext';
 
 export function SubcategoryGrid({
   nodes,
@@ -7,10 +12,12 @@ export function SubcategoryGrid({
   nodes: CategoryNode[];
   onSelect: (id: string) => void;
 }) {
+  const { t, languageCode } = useLocale();
+
   if (nodes.length === 0) {
     return (
       <p className="rounded-[var(--hb-radius-lg)] border border-dashed border-[rgba(26,92,58,0.2)] px-6 py-12 text-center text-sm text-[var(--hb-ink)]/55">
-        No sub-categories in this section yet.
+        {t('catalogue.noSubcategories')}
       </p>
     );
   }
@@ -26,11 +33,13 @@ export function SubcategoryGrid({
           >
             <CategoryIconBadge id={n.id} size="md" />
             <span className="text-sm font-semibold leading-snug sm:text-base">
-              {n.name}
+              {categoryDisplayName(n, languageCode)}
             </span>
             {n.children && n.children.length > 0 && (
               <span className="text-xs text-[var(--hb-ink)]/45">
-                {n.children.length} sub-categories
+                {t('catalogue.subcategoryCount', {
+                  count: n.children.length,
+                })}
               </span>
             )}
           </button>

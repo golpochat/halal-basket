@@ -14,19 +14,44 @@ import {
   useDeliveryCalendarQuery,
   usePlatformCatalogueQuery,
   useToastStore,
+  localizeCouponMessage,
+  localizePromoBanner,
+  localizeProductName,
+  formatUiNumber,
 } from '@halal-basket/web';
 import { useAuth } from '../../auth/AuthContext';
 import { useLocale } from '../../locale/LocaleContext';
 import { api } from '../../lib/api';
+import {
+  resolveDeliveryFee,
+  type DeliveryFeeConfig,
+} from '../../lib/delivery-fee';
 
-function formatWeekday(raw: string) {
-  const d = raw.trim();
+const DAY_KEYS = [
+  'monday',
+  'tuesday',
+  'wednesday',
+  'thursday',
+  'friday',
+  'saturday',
+  'sunday',
+] as const;
+
+function translateDay(
+  raw: string,
+  t: (key: string) => string,
+): string {
+  const d = raw.trim().toLowerCase();
+  if (!d) return '';
+  if ((DAY_KEYS as readonly string[]).includes(d)) {
+    return t(`day.${d}`);
+  }
   return d.charAt(0).toUpperCase() + d.slice(1);
 }
 
 export function CartDrawer() {
   const { session } = useAuth();
-  const { formatMoney } = useLocale();
+  const { t, formatMoney, formatNumber, languageCode } = useLocale();
   const toast = useToastStore((s) => s.toast);
   const navigate = useNavigate();
   const lines = useCartStore((s) => s.lines);
@@ -37,7 +62,7 @@ export function CartDrawer() {
     s.lines.reduce((a, l) => a + l.price * l.quantity, 0),
   );
   const discount = useCartStore((s) => s.discount());
-  const total = useCartStore((s) => s.total());
+  const itemsTotal = useCartStore((s) => s.total());
   const cartOpen = useCartStore((s) => s.cartOpen);
   const setCartOpen = useCartStore((s) => s.setCartOpen);
   const setQty = useCartStore((s) => s.setQty);
@@ -79,11 +104,14 @@ export function CartDrawer() {
     prevUnavailableKey.current = key;
     if (unavailableIds.length > 0) {
       toast(
-        `${unavailableIds.length} item${unavailableIds.length === 1 ? '' : 's'} unavailable in ${area}`,
+        t('cart.toastUnavailable', {
+          count: unavailableIds.length,
+          area,
+        }),
         'error',
       );
     } else if (prevHad) {
-      toast(`Basket available in ${area}`);
+      toast(t('cart.toastAvailable', { area }));
     }
   }, [
     area,
@@ -91,6 +119,7 @@ export function CartDrawer() {
     unavailableIds,
     catalogueQuery.isLoading,
     toast,
+    t,
   ]);
 
   const [confirmClear, setConfirmClear] = useState(false);
@@ -101,6 +130,8 @@ export function CartDrawer() {
   } | null>(null);
   const [couponBusy, setCouponBusy] = useState(false);
   const [promoBanner, setPromoBanner] = useState<string | null>(null);
+  const [deliveryConfig, setDeliveryConfig] =
+    useState<DeliveryFeeConfig | null>(null);
   const panelRef = useRef<HTMLElement>(null);
   const itemsRef = useRef<HTMLDivElement>(null);
   const [cartMounted, setCartMounted] = useState(cartOpen);
@@ -115,6 +146,29 @@ export function CartDrawer() {
       )
       .catch(() => setPromoBanner(null));
   }, []);
+
+  useEffect(() => {
+    api<DeliveryFeeConfig>('/platform/delivery-config')
+      .then(setDeliveryConfig)
+      .catch(() => setDeliveryConfig(null));
+  }, []);
+
+  const deliveryFee = useMemo(() => {
+    if (!deliveryConfig || !area || subtotal <= 0) return 0;
+    return resolveDeliveryFee({
+      mode: 'scheduled_delivery',
+      areaName: area,
+      subtotal,
+      config: deliveryConfig,
+    });
+  }, [deliveryConfig, area, subtotal]);
+
+  const grandTotal = Math.max(0, itemsTotal + deliveryFee);
+
+  const displayPromo = useMemo(() => {
+    if (!promoBanner) return null;
+    return localizePromoBanner(t, promoBanner, formatMoney);
+  }, [promoBanner, t, formatMoney]);
 
   // Rehydrate persisted codes against live platform rules.
   useEffect(() => {
@@ -214,17 +268,17 @@ export function CartDrawer() {
     );
     if (area && rows.length > 0) {
       const days = Array.from(
-        new Set(rows.map((r) => formatWeekday(r.deliveryDay))),
+        new Set(rows.map((r) => translateDay(r.deliveryDay, t))),
       ).join(', ');
-      return `Next delivery · ${area} · ${days}`;
+      return t('cart.nextDelivery', { area, days });
     }
-    if (area) return `Pickup from Halal Basket · ${area}`;
-    return 'Select a delivery area in the header';
-  }, [calendarQuery.data, area]);
+    if (area) return t('cart.pickupHint', { area });
+    return t('cart.selectAreaHint');
+  }, [calendarQuery.data, area, t, languageCode]);
 
   function goCheckout() {
     if (unavailableIds.length > 0) {
-      toast('Remove unavailable items before checkout', 'error');
+      toast(t('cart.toastRemoveBeforeCheckout'), 'error');
       return;
     }
     const items = lines.map((l) => ({
@@ -248,7 +302,7 @@ export function CartDrawer() {
       return;
     }
     if (session.user.role !== 'customer') {
-      toast('Please sign in with a customer account to order', 'error');
+      toast(t('cart.toastCustomerAccount'), 'error');
       return;
     }
     navigate('/checkout');
@@ -257,7 +311,7 @@ export function CartDrawer() {
   async function onApplyCoupon() {
     const code = couponCode.trim();
     if (!code) {
-      setCouponMsg({ ok: false, text: 'Enter a code' });
+      setCouponMsg({ ok: false, text: t('cart.enterCode') });
       return;
     }
     setCouponBusy(true);
@@ -266,6 +320,7 @@ export function CartDrawer() {
       const res = await api<{
         ok: boolean;
         message: string;
+        reason?: string;
         code?: string;
         type?: 'percent' | 'fixed';
         value?: number;
@@ -275,21 +330,44 @@ export function CartDrawer() {
         body: JSON.stringify({ code, subtotal }),
       });
       if (!res.ok || !res.code || res.type == null || res.value == null) {
-        setCouponMsg({ ok: false, text: res.message || 'Code not recognised' });
+        setCouponMsg({
+          ok: false,
+          text: localizeCouponMessage(t, {
+            reason: res.reason,
+            message: res.message,
+            code: res.code,
+          }),
+        });
         return;
       }
       setAppliedCoupon(res.code, { type: res.type, value: res.value });
-      setCouponMsg({ ok: true, text: res.message });
+      setCouponMsg({
+        ok: true,
+        text: localizeCouponMessage(t, {
+          reason: res.reason ?? 'applied',
+          message: res.message,
+          code: res.code,
+        }),
+      });
       setCouponOpen(false);
     } catch (err) {
       setCouponMsg({
         ok: false,
-        text: err instanceof Error ? err.message : 'Could not validate code',
+        text: err instanceof Error ? err.message : t('cart.validateFailed'),
       });
     } finally {
       setCouponBusy(false);
     }
   }
+
+  const openCartAria = t('cart.openAria', {
+    count,
+    total: formatMoney(grandTotal),
+  });
+  const cartBadgeLabel =
+    count > 99
+      ? `${formatUiNumber(99, languageCode)}+`
+      : formatNumber(Math.max(0, count));
 
   return (
     <>
@@ -299,11 +377,18 @@ export function CartDrawer() {
           type="button"
           className="hb-cart-tab fixed right-0 top-1/2 z-30 hidden -translate-y-1/2 cursor-pointer flex-col items-center gap-2 rounded-l-2xl bg-[var(--hb-green)] px-3 py-4 text-white shadow-[var(--hb-shadow-lg)] transition hover:bg-[var(--hb-green-hover)] sm:flex"
           onClick={() => setCartOpen(true)}
-          aria-label={`Open cart, ${count} items, ${formatMoney(total)}`}
+          aria-label={openCartAria}
         >
-          <CartWithCountIcon count={count} size={ICON_SIZES.lg} />
+          <CartWithCountIcon
+            count={count}
+            countLabel={cartBadgeLabel}
+            size={ICON_SIZES.lg}
+          />
+          <span className="text-[10px] font-semibold uppercase tracking-wide opacity-90">
+            {t('cart.tabLabel')}
+          </span>
           <span className="text-sm font-medium tabular-nums">
-            {formatMoney(total)}
+            {formatMoney(grandTotal)}
           </span>
         </button>
       )}
@@ -314,12 +399,19 @@ export function CartDrawer() {
           type="button"
           className="hb-cart-bar fixed bottom-4 left-1/2 z-30 flex -translate-x-1/2 cursor-pointer items-center gap-3 rounded-[var(--hb-radius-lg)] bg-[var(--hb-green)] px-4 py-3 text-white shadow-[var(--hb-shadow-lg)] sm:hidden"
           onClick={() => setCartOpen(true)}
-          aria-label={`Open cart, ${count} items, ${formatMoney(total)}`}
+          aria-label={openCartAria}
         >
           {UtilityIcons.cart({ size: 20 })}
-          <span className="font-medium">{count} items</span>
-          <span className="font-medium tabular-nums">{formatMoney(total)}</span>
-          <span className="font-semibold">View</span>
+          <span className="font-medium">
+            {t(
+              count === 1 ? 'cart.itemCount_one' : 'cart.itemCount_other',
+              { count },
+            )}
+          </span>
+          <span className="font-medium tabular-nums">
+            {formatMoney(grandTotal)}
+          </span>
+          <span className="font-semibold">{t('cart.view')}</span>
         </button>
       )}
 
@@ -338,10 +430,10 @@ export function CartDrawer() {
             if (!cartOpen) setCartMounted(false);
           }}
         >
-            {/* Promo banner */}
-            {count > 0 && promoBanner && (
+            {/* Promo banner — message from API */}
+            {count > 0 && displayPromo && (
               <p className="bg-[var(--hb-green)] px-4 py-2 text-center text-xs font-semibold text-white sm:text-sm">
-                {promoBanner}
+                {displayPromo}
               </p>
             )}
 
@@ -349,18 +441,29 @@ export function CartDrawer() {
             <div className="sticky top-0 z-10 border-b border-[rgba(26,92,58,0.1)] bg-white px-4 py-3 sm:px-5">
               <div className="flex items-start gap-3">
                 <span className="mt-0.5 text-[var(--hb-green)]" aria-hidden>
-                  <CartWithCountIcon count={count} size={ICON_SIZES.md} />
+                  <CartWithCountIcon
+                    count={count}
+                    countLabel={cartBadgeLabel}
+                    size={ICON_SIZES.md}
+                  />
                 </span>
                 <div className="min-w-0 flex-1">
                   <h2
                     id="cart-drawer-title"
                     className="font-display text-lg font-semibold italic tracking-tight sm:text-xl"
                   >
-                    {count} {count === 1 ? 'item' : 'items'}
+                    {t(
+                      count === 1
+                        ? 'cart.itemCount_one'
+                        : 'cart.itemCount_other',
+                      { count },
+                    )}
                   </h2>
                   <p className="mt-0.5 flex items-center gap-1.5 text-sm text-[var(--hb-green)]">
                     <span className="truncate">{deliveryHint}</span>
-                    <span className="sr-only">Fulfillment details</span>
+                    <span className="sr-only">
+                      {t('cart.fulfillmentDetails')}
+                    </span>
                     {UtilityIcons.help({
                       size: 14,
                       className: 'shrink-0 opacity-70',
@@ -369,7 +472,7 @@ export function CartDrawer() {
                   </p>
                 </div>
                 <IconButton
-                  label="Collapse cart"
+                  label={t('cart.collapse')}
                   onClick={() => setCartOpen(false)}
                 >
                   <span className="text-xl font-medium leading-none" aria-hidden>
@@ -385,10 +488,10 @@ export function CartDrawer() {
                       className="text-xs font-semibold text-[var(--hb-error)] hover:underline"
                       onClick={() => {
                         removeUnavailable(unavailableIds);
-                        toast('Unavailable items removed');
+                        toast(t('cart.removeUnavailableSuccess'));
                       }}
                     >
-                      Remove unavailable
+                      {t('cart.removeUnavailable')}
                     </button>
                   )}
                   <button
@@ -396,7 +499,7 @@ export function CartDrawer() {
                     className="text-xs font-semibold text-[var(--hb-ink)]/50 hover:text-[var(--hb-error)]"
                     onClick={() => setConfirmClear(true)}
                   >
-                    Clear cart
+                    {t('cart.clear')}
                   </button>
                 </div>
               )}
@@ -409,18 +512,22 @@ export function CartDrawer() {
             >
               {lines.length === 0 && (
                 <p className="py-12 text-center text-sm text-[var(--hb-ink)]/55">
-                  Your basket is empty. Add something delicious.
+                  {t('cart.empty')}
                 </p>
               )}
               {unavailableIds.length > 0 && area && (
                 <p className="mb-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-800">
-                  Some items are unavailable in {area}. Remove them to checkout.
+                  {t('cart.unavailableBanner', { area })}
                 </p>
               )}
               <ul className="hb-panel-stagger divide-y divide-[rgba(26,92,58,0.08)]">
                 {lines.map((l) => {
                   const lineTotal = l.price * l.quantity;
                   const unavailable = unavailableSet.has(l.productId);
+                  const displayName = localizeProductName(
+                    l.name,
+                    languageCode,
+                  );
                   return (
                     <li
                       key={l.productId}
@@ -431,45 +538,59 @@ export function CartDrawer() {
                       <div className="h-16 w-16 shrink-0 overflow-hidden rounded-[var(--hb-radius)] border border-[rgba(26,92,58,0.1)] bg-[var(--hb-mist)] sm:h-[4.5rem] sm:w-[4.5rem]">
                         <ProductImage
                           src={l.imageUrl}
-                          alt={l.name}
+                          alt={displayName}
                           size="sm"
                         />
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="line-clamp-2 text-sm font-semibold leading-snug text-[var(--hb-ink)]">
-                          {l.name}
+                          {displayName}
                         </p>
                         {unavailable ? (
                           <p className="mt-0.5 text-xs font-medium text-red-700">
-                            Unavailable in {area || 'this area'}
+                            {t('cart.unavailableLine', {
+                              area: area || t('cart.thisArea'),
+                            })}
                           </p>
                         ) : (
                           <p className="mt-0.5 text-xs text-[var(--hb-ink)]/50">
-                            {formatMoney(l.price)} each
+                            {t('cart.priceEach', {
+                              price: formatMoney(l.price),
+                            })}
                           </p>
                         )}
                         <div className="mt-2.5 flex items-center justify-between gap-2">
                           <div
                             className="inline-flex h-8 items-center overflow-hidden rounded-full border border-[rgba(26,92,58,0.14)] bg-[var(--hb-neutral-100)]"
                             role="group"
-                            aria-label={`Quantity for ${l.name}`}
+                            aria-label={t('cart.qtyAria', {
+                              name: displayName,
+                            })}
                           >
                             <button
                               type="button"
                               className="flex h-8 w-8 items-center justify-center text-base font-medium text-[var(--hb-ink)] hover:bg-[var(--hb-mist)]"
-                              aria-label={`Decrease ${l.name}`}
-                              onClick={() => setQty(l.productId, l.quantity - 1)}
+                              aria-label={t('cart.decreaseAria', {
+                                name: displayName,
+                              })}
+                              onClick={() =>
+                                setQty(l.productId, l.quantity - 1)
+                              }
                             >
                               −
                             </button>
                             <span className="min-w-7 text-center text-sm font-semibold tabular-nums">
-                              {l.quantity}
+                              {formatNumber(l.quantity)}
                             </span>
                             <button
                               type="button"
                               className="flex h-8 w-8 items-center justify-center text-base font-medium text-[var(--hb-ink)] hover:bg-[var(--hb-mist)]"
-                              aria-label={`Increase ${l.name}`}
-                              onClick={() => setQty(l.productId, l.quantity + 1)}
+                              aria-label={t('cart.increaseAria', {
+                                name: displayName,
+                              })}
+                              onClick={() =>
+                                setQty(l.productId, l.quantity + 1)
+                              }
                             >
                               +
                             </button>
@@ -497,8 +618,13 @@ export function CartDrawer() {
                   >
                     {UtilityIcons.chevronDown({ size: 16 })}
                     {couponApplied
-                      ? `Code ${couponApplied}${discount > 0 ? ` (−${formatMoney(discount)})` : ''}`
-                      : 'Coupon code'}
+                      ? discount > 0
+                        ? t('cart.couponAppliedDiscount', {
+                            code: couponApplied,
+                            discount: formatMoney(discount),
+                          })
+                        : t('cart.couponApplied', { code: couponApplied })
+                      : t('cart.coupon')}
                   </button>
                   {couponApplied && (
                     <button
@@ -509,7 +635,7 @@ export function CartDrawer() {
                         setCouponMsg(null);
                       }}
                     >
-                      Remove
+                      {t('cart.removeCoupon')}
                     </button>
                   )}
                 </div>
@@ -517,7 +643,7 @@ export function CartDrawer() {
                 <div className="mb-3 space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
                     <label className="sr-only" htmlFor="cart-coupon">
-                      Coupon code
+                      {t('cart.coupon')}
                     </label>
                     <input
                       id="cart-coupon"
@@ -526,7 +652,7 @@ export function CartDrawer() {
                         setCouponCode(e.target.value);
                         setCouponMsg(null);
                       }}
-                      placeholder="Coupon code"
+                      placeholder={t('cart.coupon')}
                       className="hb-input min-w-0 flex-1"
                       autoComplete="off"
                       disabled={couponBusy}
@@ -544,7 +670,7 @@ export function CartDrawer() {
                       onClick={() => void onApplyCoupon()}
                       disabled={couponBusy}
                     >
-                      {couponBusy ? '…' : 'Go'}
+                      {couponBusy ? '…' : t('cart.couponGo')}
                     </Button>
                     <button
                       type="button"
@@ -554,7 +680,7 @@ export function CartDrawer() {
                         setCouponMsg(null);
                       }}
                     >
-                      Close
+                      {t('cart.couponClose')}
                     </button>
                   </div>
                   {couponMsg && (
@@ -572,10 +698,38 @@ export function CartDrawer() {
                 </div>
               )}
 
-              {discount > 0 && (
-                <div className="mb-2 flex justify-between text-sm text-[var(--hb-ink)]/60">
-                  <span>Subtotal</span>
-                  <span className="tabular-nums">{formatMoney(subtotal)}</span>
+              {count > 0 && (
+                <div className="mb-3 space-y-1 text-sm text-[var(--hb-ink)]/70">
+                  <div className="flex justify-between">
+                    <span>{t('cart.subtotal')}</span>
+                    <span className="tabular-nums">
+                      {formatMoney(subtotal)}
+                    </span>
+                  </div>
+                  {discount > 0 && (
+                    <div className="flex justify-between text-[var(--hb-green)]">
+                      <span>{t('cart.discount')}</span>
+                      <span className="tabular-nums">
+                        −{formatMoney(discount)}
+                      </span>
+                    </div>
+                  )}
+                  {area && deliveryConfig && (
+                    <div className="flex justify-between">
+                      <span>{t('cart.deliveryFee')}</span>
+                      <span className="tabular-nums">
+                        {deliveryFee === 0
+                          ? t('checkout.free')
+                          : formatMoney(deliveryFee)}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between font-semibold text-[var(--hb-ink)]">
+                    <span>{t('cart.total')}</span>
+                    <span className="tabular-nums">
+                      {formatMoney(grandTotal)}
+                    </span>
+                  </div>
                 </div>
               )}
 
@@ -585,9 +739,11 @@ export function CartDrawer() {
                 onClick={goCheckout}
                 className="flex h-12 w-full cursor-pointer items-center justify-between gap-3 rounded-[var(--hb-radius)] bg-[var(--hb-green)] px-4 text-white transition hover:bg-[var(--hb-green-hover)] disabled:cursor-not-allowed disabled:opacity-55"
               >
-                <span className="text-base font-semibold">Checkout</span>
+                <span className="text-base font-semibold">
+                  {t('cart.checkout')}
+                </span>
                 <span className="rounded-md bg-[rgba(0,0,0,0.22)] px-3 py-1.5 text-sm font-semibold tabular-nums">
-                  {formatMoney(total)}
+                  {formatMoney(grandTotal)}
                 </span>
               </button>
             </div>
@@ -596,7 +752,7 @@ export function CartDrawer() {
 
       <Modal
         open={confirmClear}
-        title="Clear cart?"
+        title={t('cart.clearConfirmTitle')}
         onClose={() => setConfirmClear(false)}
         footer={
           <div className="flex gap-2">
@@ -605,7 +761,7 @@ export function CartDrawer() {
               className="flex-1"
               onClick={() => setConfirmClear(false)}
             >
-              Cancel
+              {t('cart.cancel')}
             </Button>
             <Button
               variant="primary"
@@ -613,16 +769,16 @@ export function CartDrawer() {
               onClick={() => {
                 clear();
                 setConfirmClear(false);
-                toast('Cart cleared');
+                toast(t('cart.clearSuccess'));
               }}
             >
-              Clear cart
+              {t('cart.clear')}
             </Button>
           </div>
         }
       >
         <p className="text-sm text-[var(--hb-ink)]/70">
-          This removes all items from your basket.
+          {t('cart.clearConfirmBody')}
         </p>
       </Modal>
     </>

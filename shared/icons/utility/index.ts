@@ -317,12 +317,17 @@ export function CartWithCountIcon({
   count,
   size = 48,
   className,
+  countLabel,
 }: {
   count: number;
   size?: number;
   className?: string;
+  /** Preformatted badge text (native digits). Falls back to Latin `count`. */
+  countLabel?: string;
 }) {
-  const label = count > 99 ? "99+" : String(Math.max(0, count));
+  const label =
+    countLabel ??
+    (count > 99 ? "99+" : String(Math.max(0, count)));
   const fontSize = label.length >= 3 ? 5.5 : label.length === 2 ? 6.25 : 7.5;
   const light = {
     stroke: "currentColor",
@@ -371,7 +376,9 @@ export function CartWithCountIcon({
         fontSize,
         fontWeight: 500,
         fontFamily: "var(--font-body), system-ui, sans-serif",
-        style: { letterSpacing: label.length > 2 ? "-0.04em" : undefined },
+        style: {
+          letterSpacing: label.length > 2 ? "-0.04em" : undefined,
+        },
       },
       label,
     ),

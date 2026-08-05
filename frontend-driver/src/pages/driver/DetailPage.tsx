@@ -2,8 +2,8 @@ import { FormEvent, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
   Button,
-  DELIVERY_ATTEMPT_REASONS,
-  DRIVER_FEEDBACK_TAGS,
+  deliveryAttemptReasonOptions,
+  driverFeedbackTagOptions,
   ICON_SIZES,
   MenuMultiSelect,
   MenuSelect,
@@ -719,7 +719,7 @@ export function DriverDetailPage() {
             showLabel={false}
             fullWidth
             placeholder="Select reasons…"
-            options={DELIVERY_ATTEMPT_REASONS}
+            options={deliveryAttemptReasonOptions()}
             value={failReasons}
             onChange={setFailReasons}
           />
@@ -780,7 +780,7 @@ export function DriverDetailPage() {
             showLabel
             fullWidth
             placeholder="Select tags…"
-            options={DRIVER_FEEDBACK_TAGS}
+            options={driverFeedbackTagOptions()}
             value={selectedTags}
             onChange={setSelectedTags}
           />

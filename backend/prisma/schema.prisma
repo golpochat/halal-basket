@@ -152,18 +152,21 @@ model RolePermission {
 }
 
 model Customer {
-  id          String   @id @default(uuid())
-  userId      String   @unique @map("user_id")
-  name        String
-  addressList Json     @default("[]") @map("address_list")
-  riskScore   Int      @default(0) @map("risk_score")
-  isBlocked   Boolean  @default(false) @map("is_blocked")
+  id               String    @id @default(uuid())
+  userId           String    @unique @map("user_id")
+  name             String
+  addressList      Json      @default("[]") @map("address_list")
+  riskScore        Int       @default(0) @map("risk_score")
+  isBlocked        Boolean   @default(false) @map("is_blocked")
+  whatsappOptIn    Boolean   @default(false) @map("whatsapp_opt_in")
+  whatsappOptInAt  DateTime? @map("whatsapp_opt_in_at")
 
   user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   orders    Order[]
   feedback  DriverFeedback[]
   stockHolds StockHold[]
   favourites CustomerFavourite[]
+  whatsappThreads WhatsappThread[]
 
   @@map("customers")
 }
@@ -532,4 +535,52 @@ model LegalDocument {
 
   @@index([isPublished, showInFooter, sortOrder])
   @@map("legal_documents")
+}
+
+enum WhatsappThreadStatus {
+  open
+  closed
+}
+
+enum WhatsappMessageDirection {
+  inbound
+  outbound
+}
+
+/// WhatsApp care inbox thread (Phase B/C). One thread per phone.
+model WhatsappThread {
+  id              String               @id @default(uuid())
+  phoneE164       String               @map("phone_e164")
+  customerId      String?              @map("customer_id")
+  status          WhatsappThreadStatus @default(open)
+  /// Set when customer sends LIST / free-text shopping request; cleared when staff sends assist link or closes.
+  needsAssistance Boolean              @default(false) @map("needs_assistance")
+  /// Last Meta cart that could not be placed (unlinked phone / routing failure) for staff assist.
+  pendingCommerceJson Json?            @map("pending_commerce_json")
+  lastMessageAt   DateTime             @default(now()) @map("last_message_at")
+  createdAt       DateTime             @default(now()) @map("created_at")
+  updatedAt       DateTime             @updatedAt @map("updated_at")
+
+  customer Customer?          @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  messages WhatsappMessage[]
+
+  @@unique([phoneE164])
+  @@index([status, lastMessageAt])
+  @@index([needsAssistance, lastMessageAt])
+  @@index([customerId])
+  @@map("whatsapp_threads")
+}
+
+model WhatsappMessage {
+  id                String                    @id @default(uuid())
+  threadId          String                    @map("thread_id")
+  direction         WhatsappMessageDirection
+  body              String                    @db.Text
+  providerMessageId String?                   @map("provider_message_id")
+  createdAt         DateTime                  @default(now()) @map("created_at")
+
+  thread WhatsappThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@index([threadId, createdAt])
+  @@map("whatsapp_messages")
 }

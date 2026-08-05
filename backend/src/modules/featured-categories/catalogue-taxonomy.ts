@@ -7,6 +7,7 @@ export type CatalogueNode = {
   id: string;
   name: string;
   matchNames?: string[];
+  keywords?: string[];
   children?: CatalogueNode[];
 };
 
@@ -25,11 +26,27 @@ export const CATALOGUE_TREE: CatalogueNode[] = [
             id: 'chicken-fresh',
             name: 'Fresh cuts',
             matchNames: ['Meat & Poultry'],
+            keywords: [
+              'chicken',
+              'thigh',
+              'thighs',
+              'breast',
+              'keema',
+              'whole',
+              'poultry',
+              'drumstick',
+              'drumsticks',
+              'wing',
+              'wings',
+              'leg',
+              'legs',
+            ],
           },
           {
             id: 'chicken-frozen',
             name: 'Frozen',
             matchNames: ['Meat & Poultry'],
+            keywords: ['frozen', 'iqf', 'frozen chicken'],
           },
         ],
       },
@@ -38,8 +55,39 @@ export const CATALOGUE_TREE: CatalogueNode[] = [
         name: 'Beef & Lamb',
         matchNames: ['Meat & Poultry'],
         children: [
-          { id: 'beef', name: 'Beef', matchNames: ['Meat & Poultry'] },
-          { id: 'lamb', name: 'Lamb', matchNames: ['Meat & Poultry'] },
+          {
+            id: 'beef',
+            name: 'Beef',
+            matchNames: ['Meat & Poultry'],
+            keywords: ['beef', 'cow', 'keema'],
+          },
+          {
+            id: 'lamb',
+            name: 'Lamb',
+            matchNames: ['Meat & Poultry'],
+            keywords: ['lamb', 'mutton', 'goat', 'keema'],
+          },
+        ],
+      },
+      {
+        id: 'fish',
+        name: 'Fish & Seafood',
+        matchNames: ['Meat & Poultry'],
+        keywords: [
+          'fish',
+          'hilsa',
+          'ilish',
+          'rohu',
+          'seafood',
+          'steak',
+          'steaks',
+          'salmon',
+          'prawn',
+          'prawns',
+          'shrimp',
+          'pomfret',
+          'fillet',
+          'fillets',
         ],
       },
     ],
@@ -57,7 +105,23 @@ export const CATALOGUE_TREE: CatalogueNode[] = [
           {
             id: 'fruits-fresh',
             name: 'Fresh fruit',
-            matchNames: ['Produce'],
+            matchNames: ['Produce', 'Fruits & Vegetables'],
+            keywords: [
+              'date',
+              'dates',
+              'medjool',
+              'ajwa',
+              'mango',
+              'fruit',
+              'banana',
+              'apple',
+              'pomegranate',
+              'guava',
+              'papaya',
+              'orange',
+              'grape',
+              'grapes',
+            ],
           },
         ],
       },
@@ -69,7 +133,62 @@ export const CATALOGUE_TREE: CatalogueNode[] = [
           {
             id: 'veg-leafy',
             name: 'Leafy greens',
-            matchNames: ['Produce'],
+            matchNames: ['Produce', 'Fruits & Vegetables'],
+            keywords: [
+              'spinach',
+              'coriander',
+              'cilantro',
+              'mint',
+              'lettuce',
+              'leafy',
+              'greens',
+              'saag',
+              'palak',
+              'bunch',
+              'methi',
+              'fenugreek leaves',
+              'parsley',
+            ],
+          },
+          {
+            id: 'veg-everyday',
+            name: 'Everyday vegetables',
+            matchNames: ['Produce', 'Fruits & Vegetables'],
+            keywords: [
+              'onion',
+              'onions',
+              'garlic',
+              'ginger',
+              'tomato',
+              'tomatoes',
+              'potato',
+              'potatoes',
+              'chilli',
+              'chillies',
+              'chili',
+              'chilies',
+            ],
+          },
+          {
+            id: 'veg-asian',
+            name: 'Asian vegetables',
+            matchNames: ['Produce', 'Fruits & Vegetables'],
+            keywords: [
+              'okra',
+              'bhindi',
+              'aubergine',
+              'eggplant',
+              'brinjal',
+              'baingan',
+              'gourd',
+              'lauki',
+              'karela',
+              'bitter',
+              'bottle',
+              'beans',
+              'green beans',
+              'yardlong',
+            ],
           },
         ],
       },
@@ -83,19 +202,178 @@ export const CATALOGUE_TREE: CatalogueNode[] = [
       {
         id: 'oils-spices',
         name: 'Oils & Spices',
-        matchNames: ['Pantry'],
+        matchNames: ['Pantry', 'Cooking Essentials'],
         children: [
-          { id: 'oils', name: 'Cooking oils', matchNames: ['Pantry'] },
-          { id: 'spices', name: 'Spices', matchNames: ['Pantry'] },
+          {
+            id: 'oils',
+            name: 'Cooking oils',
+            matchNames: ['Pantry', 'Cooking Essentials'],
+            keywords: [
+              'oil',
+              'oils',
+              'ghee',
+              'olive',
+              'mustard',
+              'sunflower',
+              'tahini',
+              'coconut milk',
+            ],
+          },
+          {
+            id: 'spices',
+            name: 'Spices',
+            matchNames: ['Pantry', 'Cooking Essentials'],
+            keywords: [
+              'spice',
+              'spices',
+              'masala',
+              'turmeric',
+              'cumin',
+              'coriander powder',
+              'chilli powder',
+              'chili powder',
+              'garam',
+              'biryani',
+              'cardamom',
+              'clove',
+              'cloves',
+              'cinnamon',
+              'pepper',
+              'peppercorn',
+              'peppercorns',
+              'bay',
+              'zaatar',
+              'sumac',
+              'baharat',
+              'phoron',
+              'fenugreek',
+              'mustard seeds',
+              'haldi',
+              'jeera',
+            ],
+          },
         ],
       },
       {
         id: 'grains',
         name: 'Rice & Grains',
-        matchNames: ['Pantry'],
+        matchNames: ['Pantry', 'Cooking Essentials'],
         children: [
-          { id: 'rice', name: 'Rice', matchNames: ['Pantry'] },
-          { id: 'flour', name: 'Flour & atta', matchNames: ['Pantry'] },
+          {
+            id: 'rice',
+            name: 'Rice',
+            matchNames: ['Pantry', 'Cooking Essentials'],
+            keywords: ['rice', 'basmati', 'sella', 'jeera rice'],
+          },
+          {
+            id: 'flour',
+            name: 'Flour & atta',
+            matchNames: ['Pantry', 'Cooking Essentials'],
+            keywords: [
+              'flour',
+              'atta',
+              'besan',
+              'suji',
+              'semolina',
+              'cornflour',
+              'chakki',
+              'rice flour',
+            ],
+          },
+          {
+            id: 'pulses',
+            name: 'Dals & pulses',
+            matchNames: ['Pantry', 'Cooking Essentials'],
+            keywords: [
+              'dal',
+              'daal',
+              'lentil',
+              'lentils',
+              'chickpea',
+              'chickpeas',
+              'moong',
+              'masoor',
+              'toor',
+              'urad',
+              'chana',
+              'bean',
+              'beans',
+              'fava',
+              'kidney',
+              'rajma',
+              'pulse',
+              'pulses',
+            ],
+          },
+          {
+            id: 'other-grains',
+            name: 'Other grains',
+            matchNames: ['Pantry', 'Cooking Essentials'],
+            keywords: [
+              'bulgur',
+              'freekeh',
+              'couscous',
+              'vermicelli',
+              'seviyan',
+              'wheat',
+              'barley',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'pantry-more',
+        name: 'Bread & pantry',
+        matchNames: ['Pantry', 'Cooking Essentials'],
+        children: [
+          {
+            id: 'bakery',
+            name: 'Bread & bakery',
+            matchNames: ['Pantry', 'Cooking Essentials'],
+            keywords: [
+              'naan',
+              'pita',
+              'bread',
+              'papad',
+              'papadum',
+              'chapati',
+              'roti',
+            ],
+          },
+          {
+            id: 'condiments',
+            name: 'Pickles & condiments',
+            matchNames: ['Pantry', 'Cooking Essentials'],
+            keywords: [
+              'pickle',
+              'achar',
+              'tamarind',
+              'imli',
+              'rose water',
+              'blossom',
+              'paste',
+            ],
+          },
+          {
+            id: 'sweets-pantry',
+            name: 'Sweets & desserts',
+            matchNames: ['Pantry', 'Cooking Essentials'],
+            keywords: [
+              'baklava',
+              'gulab',
+              'jamun',
+              'jaggery',
+              'gur',
+              'sweet',
+              'sweets',
+              'dessert',
+              'halwa',
+              'date',
+              'dates',
+              'medjool',
+              'ajwa',
+            ],
+          },
         ],
       },
     ],
@@ -108,13 +386,36 @@ export const CATALOGUE_TREE: CatalogueNode[] = [
       {
         id: 'tea-coffee',
         name: 'Tea & Coffee',
-        matchNames: ['Beverages'],
-        children: [{ id: 'tea', name: 'Tea', matchNames: ['Beverages'] }],
+        matchNames: ['Beverages', 'Drinks'],
+        children: [
+          {
+            id: 'tea',
+            name: 'Tea',
+            matchNames: ['Beverages', 'Drinks'],
+            keywords: ['tea', 'chai', 'assam', 'dust'],
+          },
+          {
+            id: 'coffee',
+            name: 'Coffee',
+            matchNames: ['Beverages', 'Drinks'],
+            keywords: ['coffee', 'qahwa', 'arabic coffee'],
+          },
+        ],
       },
       {
         id: 'soft-drinks',
         name: 'Soft drinks',
-        matchNames: ['Beverages'],
+        matchNames: ['Beverages', 'Drinks'],
+        keywords: [
+          'juice',
+          'syrup',
+          'squash',
+          'rooh',
+          'afza',
+          'drink',
+          'mango juice',
+          'rose syrup',
+        ],
       },
     ],
   },
@@ -126,9 +427,22 @@ export const CATALOGUE_TREE: CatalogueNode[] = [
       {
         id: 'cleaning',
         name: 'Cleaning',
-        matchNames: ['Household'],
+        matchNames: ['Household', 'Home & Cleaning'],
         children: [
-          { id: 'laundry', name: 'Laundry', matchNames: ['Household'] },
+          {
+            id: 'laundry',
+            name: 'Laundry',
+            matchNames: ['Household', 'Home & Cleaning'],
+            keywords: [
+              'laundry',
+              'detergent',
+              'soap',
+              'softener',
+              'stain',
+              'washing',
+              'fabric',
+            ],
+          },
         ],
       },
     ],
@@ -138,8 +452,26 @@ export const CATALOGUE_TREE: CatalogueNode[] = [
     name: 'Dairy & Eggs',
     matchNames: ['Dairy', 'Dairy & Eggs'],
     children: [
-      { id: 'milk', name: 'Milk', matchNames: ['Dairy'] },
-      { id: 'eggs', name: 'Eggs', matchNames: ['Dairy'] },
+      {
+        id: 'milk',
+        name: 'Milk & yoghurt',
+        matchNames: ['Dairy', 'Dairy & Eggs'],
+        keywords: [
+          'yoghurt',
+          'yogurt',
+          'doi',
+          'labneh',
+          'paneer',
+          'milk',
+          'dairy',
+        ],
+      },
+      {
+        id: 'eggs',
+        name: 'Eggs',
+        matchNames: ['Dairy', 'Dairy & Eggs'],
+        keywords: ['egg', 'eggs'],
+      },
     ],
   },
 ];
@@ -177,9 +509,6 @@ export function buildCatalogueIndex(
   return { byId, parentId, leaves };
 }
 
-/**
- * Popular chip for a leaf: parent when parent is not a root; otherwise the leaf.
- */
 export function popularDisplayId(
   leafId: string,
   index: CatalogueIndex = buildCatalogueIndex(),
@@ -196,7 +525,6 @@ export function catalogueName(
   return index.byId.get(id)?.name ?? null;
 }
 
-/** Default chips when order history is thin (tree order, deduped). */
 export function defaultPopularDisplayIds(
   index: CatalogueIndex = buildCatalogueIndex(),
 ): string[] {
@@ -219,8 +547,49 @@ function tokens(text: string): string[] {
     .filter((t) => t.length > 2 && t !== 'and' && t !== 'the');
 }
 
+const LEAF_NAME_STOP = new Set([
+  'fresh',
+  'cuts',
+  'everyday',
+  'asian',
+  'other',
+  'soft',
+  'drinks',
+  'bread',
+  'pantry',
+  'cooking',
+  'oils',
+  'milk',
+  'yoghurt',
+  'yogurt',
+  'desserts',
+  'seafood',
+  'grains',
+  'pulses',
+  'atta',
+  'bakery',
+  'condiments',
+  'pickles',
+  'sweets',
+  'dessert',
+]);
+
+function depthOf(
+  id: string,
+  index: CatalogueIndex = buildCatalogueIndex(),
+): number {
+  let d = 0;
+  let cur: string | null | undefined = id;
+  while (cur) {
+    d += 1;
+    cur = index.parentId.get(cur) ?? null;
+    if (cur === null) break;
+  }
+  return d;
+}
+
 /**
- * Map a sold product → taxonomy leaf using Product Bank category + name hints.
+ * Map a sold product → taxonomy leaf using Product Bank category + name keywords.
  */
 export function resolveProductLeafId(
   productName: string,
@@ -238,26 +607,41 @@ export function resolveProductLeafId(
 
   if (byMatch.length === 0) return null;
 
+  const nameLower = productName.toLowerCase();
   const nameTokens = new Set(tokens(productName));
   let best: CatalogueNode | null = null;
   let bestScore = -1;
 
   for (const leaf of byMatch) {
-    const leafTokens = tokens(leaf.name);
+    const nameHints = tokens(leaf.name).filter((t) => !LEAF_NAME_STOP.has(t));
+    const kwHints = (leaf.keywords ?? []).flatMap((k) => tokens(k));
+    const hints = [...nameHints, ...kwHints];
     let score = 0;
-    for (const t of leafTokens) {
-      if (nameTokens.has(t)) score += 3;
-      else if ([...nameTokens].some((n) => n.includes(t) || t.includes(n)))
+    for (const hint of hints) {
+      if (nameTokens.has(hint)) score += 4;
+      else if (nameLower.includes(hint)) score += 3;
+      else if (
+        [...nameTokens].some((n) => n.includes(hint) || hint.includes(n))
+      )
         score += 1;
     }
-    // Prefer more specific (deeper) leaves when scores tie
-    const depth = (index.parentId.get(leaf.id) ? 1 : 0) + 1;
-    const weighted = score * 10 + depth;
+    for (const kw of leaf.keywords ?? []) {
+      const phrase = kw.toLowerCase().trim();
+      if (phrase.includes(' ') && nameLower.includes(phrase)) score += 6;
+    }
+    if (
+      nameLower.includes('frozen') &&
+      (leaf.keywords ?? []).some((k) => k.toLowerCase().includes('frozen'))
+    ) {
+      score += 12;
+    }
+    const weighted = score * 10 + depthOf(leaf.id, index);
     if (weighted > bestScore) {
       bestScore = weighted;
       best = leaf;
     }
   }
 
-  return best?.id ?? byMatch[0]?.id ?? null;
+  if (best && bestScore >= 10) return best.id;
+  return byMatch[0]?.id ?? null;
 }

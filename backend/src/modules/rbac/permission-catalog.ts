@@ -195,6 +195,18 @@ export const PERMISSION_CATALOG: PermissionDef[] = [
     description: 'Create, edit, and publish legal policies',
     groupName: 'Legal',
   },
+  {
+    key: 'whatsapp.read',
+    name: 'View WhatsApp inbox',
+    description: 'Read customer WhatsApp care threads',
+    groupName: 'WhatsApp',
+  },
+  {
+    key: 'whatsapp.reply',
+    name: 'Reply on WhatsApp',
+    description: 'Send replies and simulate inbound messages',
+    groupName: 'WhatsApp',
+  },
 ];
 
 /**
@@ -219,6 +231,8 @@ export const ADMIN_ROLE_PERMISSION_KEYS = [
   'languages.read',
   'gdpr.read',
   'legal.read',
+  'whatsapp.read',
+  'whatsapp.reply',
 ] as const;
 
 export type SystemRoleDef = {
@@ -343,6 +357,8 @@ export const SYSTEM_STAFF_ROLES: SystemRoleDef[] = [
       'analytics.read',
       'legal.read',
       'legal.write',
+      'whatsapp.read',
+      'whatsapp.reply',
     ],
   },
 ];

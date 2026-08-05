@@ -75,6 +75,11 @@ Do this before a real shop UAT. Prefer any host (Railway, Fly, Render, VPS); the
 | `FEATURE_MULTI_SHOP` | `false` until split orders proven (keep off in Staging/Prod) |
 | `REALTIME_ETA_MINUTES` | `60` (optional; used when realtime is on) |
 | `REALTIME_MAX_RISK_SCORE` | `50` (0 disables risk gate) |
+| `PUBLIC_API_URL` | Staging API HTTPS origin (WhatsApp catalog images + pay header) |
+| `CUSTOMER_APP_URL` | Customer HTTPS origin (Assist / Shop / Pay links from WhatsApp) |
+| `WHATSAPP_*` | See `docs/whatsapp-meta-setup.md` when enabling WhatsApp on Staging |
+
+> **Note:** Local WhatsApp multi-shop cart tests need `FEATURE_MULTI_SHOP=true`. Staging/Prod may keep it `false` until split orders are UAT’d — WhatsApp multi-shop baskets will then park as needs-help.
 
 ### 3. Migrate + boot
 
@@ -161,5 +166,6 @@ Live order status for customers is **HTTP polling** (`GET /orders/:id/live`, ~5s
 ## Related
 
 - Pilot dry-run + Phase D smokes: [pilot-onboarding.md](./pilot-onboarding.md)
+- WhatsApp (care + catalog): [whatsapp.md](./whatsapp.md), [whatsapp-meta-setup.md](./whatsapp-meta-setup.md)
 - Incidents / payment alerts: [incident.md](./incident.md)
 - Seed accounts (local/Staging seed only): [seed-credentials.md](./seed-credentials.md)

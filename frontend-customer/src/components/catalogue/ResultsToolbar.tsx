@@ -6,26 +6,29 @@ import {
   type SortBy,
 } from '@halal-basket/web';
 import type { ReactNode } from 'react';
-
-const SORT_OPTIONS: { value: SortBy; label: string }[] = [
-  { value: 'newest', label: 'Newest first' },
-  { value: 'price-asc', label: 'Price: low to high' },
-  { value: 'price-desc', label: 'Price: high to low' },
-  { value: 'name', label: 'Name A–Z' },
-];
+import { useLocale } from '../../locale/LocaleContext';
 
 export function ResultsToolbar({ count }: { count: number }) {
+  const { t } = useLocale();
   const viewMode = useCatalogueStore((s) => s.viewMode);
   const setViewMode = useCatalogueStore((s) => s.setViewMode);
   const sortBy = useCatalogueStore((s) => s.sortBy);
   const setSortBy = useCatalogueStore((s) => s.setSortBy);
   const setFiltersOpen = useCatalogueStore((s) => s.setFiltersOpen);
 
+  const sortOptions: { value: SortBy; label: string }[] = [
+    { value: 'newest', label: t('catalogue.sortNewest') },
+    { value: 'price-asc', label: t('catalogue.sortPriceAsc') },
+    { value: 'price-desc', label: t('catalogue.sortPriceDesc') },
+    { value: 'name', label: t('catalogue.sortName') },
+  ];
+
   return (
     <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
       <p className="text-sm text-[var(--hb-ink)]/65">
-        Showing <span className="font-semibold text-[var(--hb-ink)]">{count}</span>{' '}
-        {count === 1 ? 'result' : 'results'}
+        {t(count === 1 ? 'catalogue.showing_one' : 'catalogue.showing_other', {
+          count,
+        })}
       </p>
 
       <div className="flex flex-wrap items-center gap-2 sm:gap-3">
@@ -37,34 +40,34 @@ export function ResultsToolbar({ count }: { count: number }) {
           onClick={() => setFiltersOpen(true)}
         >
           {UtilityIcons.filters({ size: 18 })}
-          Filters
+          {t('catalogue.filters')}
         </Button>
 
         <div
           className="flex h-10 overflow-hidden rounded-[var(--hb-radius)] border border-[rgba(26,92,58,0.18)] bg-white"
           role="group"
-          aria-label="View mode"
+          aria-label={t('catalogue.viewMode')}
         >
           <ViewBtn
             active={viewMode === 'grid'}
             onClick={() => setViewMode('grid')}
-            label="Grid view"
+            label={t('catalogue.gridView')}
           >
             {UtilityIcons.grid({ size: 16 })}
           </ViewBtn>
           <ViewBtn
             active={viewMode === 'list'}
             onClick={() => setViewMode('list')}
-            label="List view"
+            label={t('catalogue.listView')}
           >
             {UtilityIcons.list({ size: 16 })}
           </ViewBtn>
         </div>
 
         <MenuSelect
-          label="Sort by"
+          label={t('catalogue.sortBy')}
           value={sortBy}
-          options={SORT_OPTIONS}
+          options={sortOptions}
           onChange={(v) => setSortBy(v as SortBy)}
           triggerClassName="min-w-[10.5rem] sm:min-w-[12rem]"
         />

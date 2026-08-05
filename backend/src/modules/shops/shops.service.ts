@@ -8,6 +8,18 @@ import {
 } from '../platform-locale/warehouse-publish';
 import { StockService } from '../stock/stock.service';
 
+function resolveProductImageUrl(value: string | null | undefined): string | null {
+  if (!value) return null;
+  if (/^https?:\/\//i.test(value)) return value;
+  if (value.startsWith('/uploads/')) {
+    const base = (
+      process.env.PUBLIC_API_URL ?? 'http://localhost:3000'
+    ).replace(/\/$/, '');
+    return `${base}${value}`;
+  }
+  return value;
+}
+
 @Injectable()
 export class ShopsService {
   constructor(
@@ -51,19 +63,29 @@ export class ShopsService {
   }
 
   listShopProducts(shopId: string) {
-    return this.prisma.shopProduct.findMany({
-      where: {
-        shopId,
-        isVisible: true,
-        product: { isActive: true },
-      },
-      include: {
-        product: {
-          include: { category: true },
+    return this.prisma.shopProduct
+      .findMany({
+        where: {
+          shopId,
+          isVisible: true,
+          product: { isActive: true },
         },
-      },
-      orderBy: { product: { name: 'asc' } },
-    });
+        include: {
+          product: {
+            include: { category: true },
+          },
+        },
+        orderBy: { product: { name: 'asc' } },
+      })
+      .then((rows) =>
+        rows.map((row) => ({
+          ...row,
+          product: {
+            ...row.product,
+            imageUrl: resolveProductImageUrl(row.product.imageUrl),
+          },
+        })),
+      );
   }
 
   /**
@@ -157,7 +179,10 @@ export class ShopsService {
         price: (acc.bestPrice ?? new Prisma.Decimal(0)).toString(),
         discountPrice: null as string | null,
         isInStock: acc.isInStock,
-        product: acc.product,
+        product: {
+          ...acc.product,
+          imageUrl: resolveProductImageUrl(acc.product.imageUrl),
+        },
       }))
       .sort((a, b) => a.product.name.localeCompare(b.product.name));
   }

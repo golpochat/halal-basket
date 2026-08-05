@@ -21,6 +21,7 @@ import {
   OrderLiveHub,
   type OrderLiveSnapshot,
 } from './order-live.hub';
+import { WhatsappService } from '../whatsapp/whatsapp.service';
 
 @Injectable()
 export class OrdersService {
@@ -31,6 +32,7 @@ export class OrdersService {
     private readonly stock: StockService,
     private readonly metrics: MetricsService,
     private readonly liveHub: OrderLiveHub,
+    private readonly whatsapp: WhatsappService,
   ) {}
 
   async create(userId: string, dto: CreateOrderDto) {
@@ -177,6 +179,10 @@ export class OrdersService {
       return this.getByIdInternal(tx, order.id);
     }).then((created) => {
       this.metrics.inc('orderCreates');
+      this.whatsapp.notifySafe(
+        () => this.whatsapp.notifyOrderPlaced(created.id),
+        `order_placed ${created.id}`,
+      );
       return created;
     });
   }
@@ -377,6 +383,15 @@ export class OrdersService {
         },
       },
     });
+    this.whatsapp.notifySafe(
+      () =>
+        this.whatsapp.notifyFulfillmentUpdate(
+          input.orderId,
+          String(input.fulfillmentStatus).replaceAll('_', ' '),
+          input.note,
+        ),
+      `fulfillment ${input.orderId} ${input.fulfillmentStatus}`,
+    );
   }
 
   private async getByIdInternal(

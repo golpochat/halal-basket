@@ -7,7 +7,16 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import {
+  filterLanguagesWithPacks,
+  t as translate,
+  type MessageKey,
+  type TVars,
+} from '@halal-basket/web';
 import { api } from '../lib/api';
+
+/** Driver ops UI is always English. */
+const OPS_UI_LANG = 'en';
 
 export type PlatformCurrency = {
   id: string;
@@ -53,11 +62,11 @@ type LocaleContextValue = {
   setCurrencyCode: (code: string) => void;
   setLanguageCode: (code: string) => void;
   formatMoney: (amountInDefaultCurrency: number) => string;
+  t: (key: MessageKey | string, vars?: TVars) => string;
   refresh: () => Promise<void>;
 };
 
 const STORAGE_CURRENCY = 'hb_currency';
-const STORAGE_LANGUAGE = 'hb_language';
 
 const LocaleContext = createContext<LocaleContextValue | null>(null);
 
@@ -65,25 +74,26 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [data, setData] = useState<PublicLocale | null>(null);
   const [currencyCode, setCurrencyCodeState] = useState('EUR');
-  const [languageCode, setLanguageCodeState] = useState('en');
+  const languageCode = OPS_UI_LANG;
 
   const refresh = useCallback(async () => {
     const locale = await api<PublicLocale>('/platform/locale');
-    setData(locale);
+    const languages = filterLanguagesWithPacks(locale.languages);
+    const packLocale: PublicLocale = {
+      ...locale,
+      languages,
+      showLanguagePicker: false,
+      defaultLanguageCode: OPS_UI_LANG,
+    };
+    setData(packLocale);
 
     const storedCurrency = localStorage.getItem(STORAGE_CURRENCY);
-    const storedLanguage = localStorage.getItem(STORAGE_LANGUAGE);
     const nextCurrency =
       (storedCurrency &&
-        locale.currencies.find((c) => c.code === storedCurrency)?.code) ||
-      locale.defaultCurrencyCode;
-    const nextLanguage =
-      (storedLanguage &&
-        locale.languages.find((l) => l.code === storedLanguage)?.code) ||
-      locale.defaultLanguageCode;
+        packLocale.currencies.find((c) => c.code === storedCurrency)?.code) ||
+      packLocale.defaultCurrencyCode;
 
     setCurrencyCodeState(nextCurrency);
-    setLanguageCodeState(nextLanguage);
     setReady(true);
   }, []);
 
@@ -95,7 +105,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
         showCurrencyPicker: false,
         showLanguagePicker: false,
         defaultCurrencyCode: 'EUR',
-        defaultLanguageCode: 'en',
+        defaultLanguageCode: OPS_UI_LANG,
       });
       setReady(true);
     });
@@ -106,15 +116,14 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
     data?.currencies.find((c) => c.isDefault) ??
     null;
   const language =
-    data?.languages.find((l) => l.code === languageCode) ??
+    data?.languages.find((l) => l.code === OPS_UI_LANG) ??
     data?.languages.find((l) => l.isDefault) ??
     null;
 
   useEffect(() => {
-    if (!language) return;
-    document.documentElement.lang = language.code;
-    document.documentElement.dir = language.isRtl ? 'rtl' : 'ltr';
-  }, [language]);
+    document.documentElement.lang = OPS_UI_LANG;
+    document.documentElement.dir = 'ltr';
+  }, []);
 
   const setCurrencyCode = useCallback(
     (code: string) => {
@@ -125,14 +134,9 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
     [data],
   );
 
-  const setLanguageCode = useCallback(
-    (code: string) => {
-      if (!data?.languages.some((l) => l.code === code)) return;
-      setLanguageCodeState(code);
-      localStorage.setItem(STORAGE_LANGUAGE, code);
-    },
-    [data],
-  );
+  const setLanguageCode = useCallback((_code: string) => {
+    /* Driver UI is locked to English. */
+  }, []);
 
   const formatMoney = useCallback(
     (amountInDefaultCurrency: number) => {
@@ -140,7 +144,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
       const converted = amountInDefaultCurrency * rate;
       const symbol = currency?.symbol ?? '€';
       try {
-        return new Intl.NumberFormat(language?.code ?? 'en', {
+        return new Intl.NumberFormat(OPS_UI_LANG, {
           style: 'currency',
           currency: currency?.code ?? 'EUR',
         }).format(converted);
@@ -148,7 +152,13 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
         return `${symbol}${converted.toFixed(2)}`;
       }
     },
-    [currency, language],
+    [currency],
+  );
+
+  const t = useCallback(
+    (key: MessageKey | string, vars?: TVars) =>
+      translate(key, OPS_UI_LANG, vars),
+    [],
   );
 
   const value = useMemo<LocaleContextValue>(
@@ -157,7 +167,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
       currencies: data?.currencies ?? [],
       languages: data?.languages ?? [],
       showCurrencyPicker: data?.showCurrencyPicker ?? false,
-      showLanguagePicker: data?.showLanguagePicker ?? false,
+      showLanguagePicker: false,
       currencyCode,
       languageCode,
       currency,
@@ -165,6 +175,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
       setCurrencyCode,
       setLanguageCode,
       formatMoney,
+      t,
       refresh,
     }),
     [
@@ -177,6 +188,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
       setCurrencyCode,
       setLanguageCode,
       formatMoney,
+      t,
       refresh,
     ],
   );

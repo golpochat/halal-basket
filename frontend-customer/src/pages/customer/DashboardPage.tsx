@@ -1,16 +1,18 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import {
+  formatFulfillmentMode,
   formatOrderStatus,
+  formatPaymentStatus,
   toastError,
   useCartStore,
   useToastStore,
   type CustomerAddress,
-} from '@halal-basket/web';
-import { useAuth } from '../../auth/AuthContext';
-import { useLocale } from '../../locale/LocaleContext';
-import { api } from '../../lib/api';
-import { loadOrderIntoCart } from '../../lib/reorder';
+} from "@halal-basket/web";
+import { useAuth } from "../../auth/AuthContext";
+import { useLocale } from "../../locale/LocaleContext";
+import { api } from "../../lib/api";
+import { loadOrderIntoCart } from "../../lib/reorder";
 
 type OrderItem = {
   id: string;
@@ -23,6 +25,7 @@ type OrderItem = {
 type Order = {
   id: string;
   status: string;
+  paymentStatus?: string;
   fulfillmentMode: string;
   totalAmount: string | number;
   createdAt?: string;
@@ -40,14 +43,34 @@ type Profile = {
   addressList?: CustomerAddress[];
 };
 
+const ADDRESS_LABEL_KEYS: Record<string, string> = {
+  Home: "addresses.label.home",
+  Work: "addresses.label.work",
+  Family: "addresses.label.family",
+  Other: "addresses.label.other",
+};
+
 function defaultAddress(list: CustomerAddress[] | undefined) {
   if (!list?.length) return null;
   return list.find((a) => a.isDefault) ?? list[0] ?? null;
 }
 
+/** Keep the greeting name emphasized when it appears in the translated string. */
+function WelcomeLine({ name, text }: { name: string; text: string }) {
+  const idx = name ? text.indexOf(name) : -1;
+  if (idx < 0) return <>{text}</>;
+  return (
+    <>
+      {text.slice(0, idx)}
+      <span className="font-medium text-[var(--hb-ink)]">{name}</span>
+      {text.slice(idx + name.length)}
+    </>
+  );
+}
+
 export function CustomerDashboardPage() {
   const { session } = useAuth();
-  const { formatMoney } = useLocale();
+  const { formatMoney, t, languageCode } = useLocale();
   const navigate = useNavigate();
   const toast = useToastStore((s) => s.toast);
   const setCartOpen = useCartStore((s) => s.setCartOpen);
@@ -60,8 +83,8 @@ export function CustomerDashboardPage() {
   useEffect(() => {
     let cancelled = false;
     Promise.all([
-      api<Profile>('/auth/me', { token }),
-      api<Order[]>('/customers/me/orders', { token }),
+      api<Profile>("/auth/me", { token }),
+      api<Order[]>("/customers/me/orders", { token }),
     ])
       .then(([p, o]) => {
         if (cancelled) return;
@@ -69,74 +92,89 @@ export function CustomerDashboardPage() {
         setOrders(o);
       })
       .catch((e: unknown) => {
-        if (!cancelled) toastError(e, 'Could not load your dashboard');
+        if (!cancelled) toastError(e, t("dashboard.loadFailed"));
       });
     return () => {
       cancelled = true;
     };
-  }, [token]);
+  }, [token, t]);
 
   const recent = useMemo(() => (orders ?? []).slice(0, 5), [orders]);
   const address = defaultAddress(profile?.addressList);
   const greetingName =
     profile?.name?.trim() ||
-    session?.user.email?.split('@')[0] ||
-    'there';
+    session?.user.email?.split("@")[0] ||
+    t("dashboard.greetingFallback");
+
+  function displayAddressLabel(label: string) {
+    const key = ADDRESS_LABEL_KEYS[label];
+    return key ? t(key) : label;
+  }
 
   function onReorder(order: Order) {
+    if (order.paymentStatus !== "paid" || order.status === "cancelled") {
+      toast(t("dashboard.reorderEmpty"), "error");
+      return;
+    }
     const items = order.items ?? [];
     if (items.length === 0) {
-      toast('This order has no items to reorder', 'error');
+      toast(t("dashboard.reorderEmpty"), "error");
       return;
     }
     setReorderingId(order.id);
     const added = loadOrderIntoCart(items);
     setReorderingId(null);
     if (added === 0) {
-      toast('Could not load items into your basket', 'error');
+      toast(t("dashboard.reorderFailed"), "error");
       return;
     }
-    toast(`Added ${added} item${added === 1 ? '' : 's'} from a previous order`);
+    toast(t("dashboard.reorderAdded", { count: added }));
     setCartOpen(true);
-    navigate('/');
+    navigate("/");
   }
 
   return (
     <div className="space-y-8">
       <div>
         <p className="text-sm text-[var(--hb-ink)]/60">
-          Welcome, <span className="font-medium text-[var(--hb-ink)]">{greetingName}</span>.
-          Pick up where you left off.
+          <WelcomeLine
+            name={greetingName}
+            text={t("dashboard.welcome", { name: greetingName })}
+          />
         </p>
       </div>
 
       <section className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
         <div className="hb-surface p-5 shadow-sm">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="font-semibold">Previous purchases</h2>
+            <h2 className="font-semibold">
+              {t("dashboard.previousPurchases")}
+            </h2>
             <Link
               to="/customer/orders"
               className="text-sm font-medium text-[var(--hb-green)]"
             >
-              View all
+              {t("dashboard.viewAll")}
             </Link>
           </div>
           <p className="mt-1 text-sm text-[var(--hb-ink)]/55">
-            Reorder a past basket or open live status.
+            {t("dashboard.reorderHint")}
           </p>
 
           {!orders ? (
-            <p className="mt-4 text-sm text-[var(--hb-ink)]/55">Loading orders…</p>
+            <p className="mt-4 text-sm text-[var(--hb-ink)]/55">
+              {t("dashboard.loadingOrders")}
+            </p>
           ) : recent.length === 0 ? (
             <div className="mt-4 rounded-xl bg-[var(--hb-mist)]/60 px-4 py-5">
               <p className="text-sm text-[var(--hb-ink)]/70">
-                No orders yet. Browse the catalogue to place your first order.
+                {t("dashboard.noOrders")}
               </p>
               <Link
                 to="/"
                 className="mt-3 inline-block text-sm font-medium text-[var(--hb-green)]"
               >
-                Continue shopping
+                {t("dashboard.continueShopping")}
               </Link>
             </div>
           ) : (
@@ -146,6 +184,8 @@ export function CustomerDashboardPage() {
                 const deliveryDate = order.fulfillments?.[0]?.deliveryDate;
                 const itemCount =
                   order.items?.reduce((n, i) => n + i.quantity, 0) ?? 0;
+                const paid = order.paymentStatus === "paid";
+                const ref = order.id.slice(0, 8).toUpperCase();
                 return (
                   <li
                     key={order.id}
@@ -153,45 +193,68 @@ export function CustomerDashboardPage() {
                   >
                     <div className="min-w-0">
                       <p className="text-sm font-semibold">
+                        <span className="font-mono tracking-wide">{ref}</span>
+                        {" · "}
                         {order.createdAt
                           ? new Date(order.createdAt).toLocaleDateString(
-                              undefined,
+                              languageCode,
                               {
-                                day: 'numeric',
-                                month: 'short',
-                                year: 'numeric',
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
                               },
                             )
-                          : order.id.slice(0, 8)}{' '}
+                          : "—"}{" "}
                         · {formatMoney(Number(order.totalAmount))}
                       </p>
                       <p className="mt-0.5 text-xs text-[var(--hb-ink)]/55">
                         <span className="font-medium text-[var(--hb-ink)]/70">
-                          {formatOrderStatus(order.status)}
+                          {formatOrderStatus(order.status, languageCode)}
                         </span>
-                        {' · '}
-                        {order.fulfillmentMode.replaceAll('_', ' ')}
-                        {itemCount > 0 ? ` · ${itemCount} items` : ''}
-                        {shopName ? ` · ${shopName}` : ''}
+                        {" · "}
+                        {formatPaymentStatus(
+                          order.paymentStatus ?? "pending",
+                          languageCode,
+                        )}
+                        {" · "}
+                        {formatFulfillmentMode(
+                          order.fulfillmentMode,
+                          languageCode,
+                        )}
+                        {itemCount > 0
+                          ? ` · ${t("dashboard.itemsSuffix", { count: itemCount })}`
+                          : ""}
+                        {shopName ? ` · ${shopName}` : ""}
                         {deliveryDate
-                          ? ` · ${new Date(deliveryDate).toLocaleDateString()}`
-                          : ''}
+                          ? ` · ${new Date(deliveryDate).toLocaleDateString(languageCode)}`
+                          : ""}
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        className="hb-btn hb-btn-ghost h-9 px-3 text-sm"
-                        disabled={reorderingId === order.id}
-                        onClick={() => onReorder(order)}
-                      >
-                        {reorderingId === order.id ? 'Loading…' : 'Reorder'}
-                      </button>
+                      {!paid ? (
+                        <Link
+                          to={`/orders/${order.id}/confirmation`}
+                          className="hb-btn hb-btn-ghost h-9 px-3 text-sm font-semibold text-[var(--hb-green)]"
+                        >
+                          {t("orders.payNow")}
+                        </Link>
+                      ) : (
+                        <button
+                          type="button"
+                          className="hb-btn hb-btn-ghost h-9 px-3 text-sm"
+                          disabled={reorderingId === order.id}
+                          onClick={() => onReorder(order)}
+                        >
+                          {reorderingId === order.id
+                            ? t("dashboard.loading")
+                            : t("dashboard.reorder")}
+                        </button>
+                      )}
                       <Link
                         to={`/customer/orders/${order.id}`}
                         className="hb-btn hb-btn-ghost h-9 px-3 text-sm"
                       >
-                        Details
+                        {t("dashboard.details")}
                       </Link>
                     </div>
                   </li>
@@ -203,25 +266,27 @@ export function CustomerDashboardPage() {
 
         <div className="hb-surface p-5 shadow-sm">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="font-semibold">Delivery address</h2>
+            <h2 className="font-semibold">{t("dashboard.deliveryAddress")}</h2>
             <Link
               to="/customer/addresses"
               className="text-sm font-medium text-[var(--hb-green)]"
             >
-              Manage
+              {t("dashboard.manage")}
             </Link>
           </div>
           <p className="mt-1 text-sm text-[var(--hb-ink)]/55">
-            Default address used at checkout.
+            {t("dashboard.defaultAddressHint")}
           </p>
 
           {!profile ? (
-            <p className="mt-4 text-sm text-[var(--hb-ink)]/55">Loading…</p>
+            <p className="mt-4 text-sm text-[var(--hb-ink)]/55">
+              {t("dashboard.loading")}
+            </p>
           ) : address ? (
             <div className="mt-4 rounded-xl bg-[var(--hb-mist)]/60 px-4 py-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-[var(--hb-ink)]/45">
-                {address.label}
-                {address.isDefault ? ' · Default' : ''}
+                {displayAddressLabel(address.label)}
+                {address.isDefault ? ` · ${t("dashboard.defaultSuffix")}` : ""}
               </p>
               <p className="mt-1 text-sm font-medium">{address.line1}</p>
               <p className="text-sm text-[var(--hb-ink)]/65">
@@ -231,20 +296,19 @@ export function CustomerDashboardPage() {
                 to="/"
                 className="mt-3 inline-block text-sm font-medium text-[var(--hb-green)]"
               >
-                Continue shopping
+                {t("dashboard.continueShopping")}
               </Link>
             </div>
           ) : (
             <div className="mt-4 rounded-xl bg-[var(--hb-mist)]/60 px-4 py-5">
               <p className="text-sm text-[var(--hb-ink)]/70">
-                No saved delivery address yet. Add one so checkout can prefill
-                your details.
+                {t("dashboard.noAddress")}
               </p>
               <Link
                 to="/customer/addresses"
                 className="mt-3 inline-block text-sm font-medium text-[var(--hb-green)]"
               >
-                Add address
+                {t("dashboard.addAddress")}
               </Link>
             </div>
           )}

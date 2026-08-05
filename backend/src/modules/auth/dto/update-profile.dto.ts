@@ -2,6 +2,7 @@ import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
+  IsBoolean,
   IsEmail,
   IsOptional,
   IsString,
@@ -40,6 +41,11 @@ export class UpdateProfileDto {
   @IsString()
   @MinLength(8)
   newPassword?: string;
+
+  /** Customer: transactional WhatsApp order updates. */
+  @IsOptional()
+  @IsBoolean()
+  whatsappOptIn?: boolean;
 
   /** Customer saved addresses. Omit to leave unchanged; send [] to clear. */
   @IsOptional()

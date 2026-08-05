@@ -1,4 +1,3 @@
-import { Badge } from '../ui/Badge';
 import { useLocale } from '../../locale/LocaleContext';
 
 export type ProductCardData = {
@@ -9,7 +8,6 @@ export type ProductCardData = {
   shopName?: string;
   isInStock: boolean;
   categoryName?: string | null;
-  verifiedHalal?: boolean;
 };
 
 export function ProductCard({
@@ -63,11 +61,6 @@ export function ProductCard({
                 strokeLinejoin="round"
               />
             </svg>
-          </div>
-        )}
-        {product.verifiedHalal && (
-          <div className="absolute left-2 top-2">
-            <Badge tone="gold">Halal</Badge>
           </div>
         )}
       </div>

@@ -6,6 +6,18 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 
+function resolveProductImageUrl(value: string | null | undefined): string | null {
+  if (!value) return null;
+  if (/^https?:\/\//i.test(value)) return value;
+  if (value.startsWith('/uploads/')) {
+    const base = (
+      process.env.PUBLIC_API_URL ?? 'http://localhost:3000'
+    ).replace(/\/$/, '');
+    return `${base}${value}`;
+  }
+  return value;
+}
+
 @Injectable()
 export class FavouritesService {
   constructor(private readonly prisma: PrismaService) {}
@@ -50,7 +62,12 @@ export class FavouritesService {
       items: rows.map((r) => ({
         productId: r.productId,
         createdAt: r.createdAt,
-        product: r.product,
+        product: r.product
+          ? {
+              ...r.product,
+              imageUrl: resolveProductImageUrl(r.product.imageUrl),
+            }
+          : r.product,
       })),
     };
   }

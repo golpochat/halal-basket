@@ -4,11 +4,13 @@ import {
   type AccountMenuItem,
 } from '@halal-basket/web';
 import { useAuth } from '../../auth/AuthContext';
+import { useLocale } from '../../locale/LocaleContext';
 import { homeForRole } from '../../lib/api';
 
 /** Avatar account menu — shared look with all role dashboards. */
 export function ProfileMenu() {
   const { session, logout } = useAuth();
+  const { t } = useLocale();
   if (!session) return null;
 
   const role = session.user.role;
@@ -18,31 +20,31 @@ export function ProfileMenu() {
     items.push(
       {
         key: 'dashboard',
-        label: 'Dashboard',
+        label: t('nav.dashboard'),
         to: '/customer/dashboard',
         icon: 'home',
       },
       {
         key: 'profile',
-        label: 'My Profile',
+        label: t('nav.myProfile'),
         to: '/customer/profile',
         icon: 'account',
       },
       {
         key: 'addresses',
-        label: 'Addresses',
+        label: t('nav.addresses'),
         to: '/customer/addresses',
         icon: 'home',
       },
       {
         key: 'orders',
-        label: 'My orders',
+        label: t('nav.orders'),
         to: '/customer/orders',
         icon: 'package',
       },
       {
         key: 'favourites',
-        label: 'Favourites',
+        label: t('nav.favourites'),
         to: '/customer/favourites',
         icon: 'heart',
       },
@@ -50,7 +52,11 @@ export function ProfileMenu() {
   } else {
     const dest = homeForRole(role);
     const label =
-      role === 'shop' ? 'Shop' : role === 'driver' ? 'Driver' : 'Admin';
+      role === 'shop'
+        ? t('nav.shop')
+        : role === 'driver'
+          ? t('nav.driver')
+          : t('nav.admin');
     items.push({
       key: 'home',
       label,
@@ -68,6 +74,11 @@ export function ProfileMenu() {
       onLogout={logout}
       portal
       triggerClassName="hb-profile-trigger"
+      signOutLabel={t('chrome.signOut')}
+      accountLabel={t('chrome.account')}
+      accountMenuAriaLabel={t('chrome.accountMenu')}
+      closeMenuAriaLabel={t('chrome.closeAccountMenu')}
+      myProfileLabel={t('nav.myProfile')}
     />
   );
 }

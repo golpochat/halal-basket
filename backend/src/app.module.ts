@@ -23,6 +23,7 @@ import { FeaturedCategoriesModule } from './modules/featured-categories/featured
 import { LegalModule } from './modules/legal/legal.module';
 import { FavouritesModule } from './modules/favourites/favourites.module';
 import { RbacModule } from './modules/rbac/rbac.module';
+import { WhatsappModule } from './modules/whatsapp/whatsapp.module';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 import { HttpLoggingInterceptor } from './common/http-logging.interceptor';
 
@@ -59,6 +60,7 @@ import { HttpLoggingInterceptor } from './common/http-logging.interceptor';
     LegalModule,
     FavouritesModule,
     RbacModule,
+    WhatsappModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

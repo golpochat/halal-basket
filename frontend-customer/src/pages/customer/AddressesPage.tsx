@@ -15,6 +15,7 @@ import {
   type CustomerAddress,
 } from '@halal-basket/web';
 import { useAuth } from '../../auth/AuthContext';
+import { useLocale } from '../../locale/LocaleContext';
 import { api } from '../../lib/api';
 
 type Profile = {
@@ -28,6 +29,13 @@ type CalendarRow = {
 };
 
 const MAX_ADDRESSES = 10;
+
+const ADDRESS_LABEL_KEYS: Record<string, string> = {
+  Home: 'addresses.label.home',
+  Work: 'addresses.label.work',
+  Family: 'addresses.label.family',
+  Other: 'addresses.label.other',
+};
 
 type Draft = {
   id: string | null;
@@ -57,7 +65,8 @@ function newAddressId() {
 }
 
 export function CustomerAddressesPage() {
-  useDashboardTitle('Addresses');
+  const { t } = useLocale();
+  useDashboardTitle(t('addresses.title'));
   const { session, setSession } = useAuth();
   const token = session!.accessToken;
 
@@ -69,6 +78,11 @@ export function CustomerAddressesPage() {
   const [draft, setDraft] = useState<Draft>(() => emptyDraft(true));
 
   const areaOptions = useMemo(() => areas, [areas]);
+
+  function displayLabel(label: string) {
+    const key = ADDRESS_LABEL_KEYS[label];
+    return key ? t(key) : label;
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -86,7 +100,7 @@ export function CustomerAddressesPage() {
         setAreas(nextAreas);
       })
       .catch((e: unknown) => {
-        if (!cancelled) toastError(e, 'Could not load addresses');
+        if (!cancelled) toastError(e, t('addresses.loadFailed'));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -94,7 +108,7 @@ export function CustomerAddressesPage() {
     return () => {
       cancelled = true;
     };
-  }, [token]);
+  }, [token, t]);
 
   async function persist(next: CustomerAddress[]) {
     setSaving(true);
@@ -120,7 +134,7 @@ export function CustomerAddressesPage() {
       });
       return true;
     } catch (e) {
-      toastError(e, 'Could not save addresses');
+      toastError(e, t('addresses.saveFailed'));
       return false;
     } finally {
       setSaving(false);
@@ -129,7 +143,7 @@ export function CustomerAddressesPage() {
 
   function startAdd() {
     if (list.length >= MAX_ADDRESSES) {
-      toastError(`You can save up to ${MAX_ADDRESSES} addresses`);
+      toastError(t('addresses.maxReached', { max: MAX_ADDRESSES }));
       return;
     }
     setDraft(emptyDraft(list.length === 0));
@@ -156,23 +170,23 @@ export function CustomerAddressesPage() {
   async function onSaveDraft(e: FormEvent) {
     e.preventDefault();
     if (!draft.label.trim()) {
-      toastError('Please choose a label');
+      toastError(t('addresses.err.label'));
       return;
     }
     if (draft.line1.trim().length < 3) {
-      toastError('Please enter an address');
+      toastError(t('addresses.err.address'));
       return;
     }
     if (!draft.eircode.trim()) {
-      toastError('Please enter an Eircode');
+      toastError(t('addresses.err.eircode'));
       return;
     }
     if (!isValidEircode(draft.eircode)) {
-      toastError('Enter a valid Irish Eircode (e.g. A65 F4E2)');
+      toastError(t('addresses.err.eircodeInvalid'));
       return;
     }
     if (!draft.area_name || !areaOptions.includes(draft.area_name)) {
-      toastError('Choose a delivery location from the list');
+      toastError(t('addresses.err.location'));
       return;
     }
 
@@ -201,7 +215,9 @@ export function CustomerAddressesPage() {
 
     const ok = await persist(next);
     if (ok) {
-      toastSuccess(draft.id ? 'Address updated' : 'Address saved');
+      toastSuccess(
+        draft.id ? t('addresses.toast.updated') : t('addresses.toast.saved'),
+      );
       cancelEdit();
     }
   }
@@ -209,7 +225,7 @@ export function CustomerAddressesPage() {
   async function setDefault(id: string) {
     const next = list.map((a) => ({ ...a, isDefault: a.id === id }));
     const ok = await persist(next);
-    if (ok) toastSuccess('Default address updated');
+    if (ok) toastSuccess(t('addresses.toast.default'));
   }
 
   async function remove(id: string) {
@@ -219,13 +235,17 @@ export function CustomerAddressesPage() {
     }
     const ok = await persist(next);
     if (ok) {
-      toastSuccess('Address removed');
+      toastSuccess(t('addresses.toast.removed'));
       if (draft.id === id) cancelEdit();
     }
   }
 
   if (loading) {
-    return <p className="text-sm text-[var(--hb-ink)]/55">Loading addresses…</p>;
+    return (
+      <p className="text-sm text-[var(--hb-ink)]/55">
+        {t('addresses.loading')}
+      </p>
+    );
   }
 
   return (
@@ -233,7 +253,7 @@ export function CustomerAddressesPage() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-sm text-[var(--hb-ink)]/55">
-            Save delivery addresses for checkout. Only one can be the default.
+            {t('addresses.intro')}
           </p>
         </div>
         {!editing ? (
@@ -243,7 +263,7 @@ export function CustomerAddressesPage() {
             onClick={startAdd}
             disabled={saving || list.length >= MAX_ADDRESSES}
           >
-            + Add New
+            {t('addresses.addNew')}
           </button>
         ) : null}
       </div>
@@ -254,43 +274,43 @@ export function CustomerAddressesPage() {
           className="hb-surface space-y-4 p-5 shadow-sm"
         >
           <h2 className="font-semibold">
-            {draft.id ? 'Edit address' : 'New address'}
+            {draft.id ? t('addresses.editTitle') : t('addresses.newTitle')}
           </h2>
 
           <SelectInput
-            label="Label"
+            label={t('addresses.label')}
             required
             value={draft.label}
             options={ADDRESS_LABELS.map((label) => ({
               value: label,
-              label,
+              label: displayLabel(label),
             }))}
             onChange={(value) => setDraft((d) => ({ ...d, label: value }))}
           />
 
           <TextInput
-            label="Address"
+            label={t('addresses.address')}
             value={draft.line1}
             onChange={(e) => setDraft((d) => ({ ...d, line1: e.target.value }))}
-            placeholder="House number and street"
+            placeholder={t('addresses.addressPlaceholder')}
             required
             autoComplete="street-address"
           />
 
           <TextInput
-            label="Eircode"
+            label={t('addresses.eircode')}
             value={draft.eircode}
             onChange={(e) =>
               setDraft((d) => ({ ...d, eircode: e.target.value.toUpperCase() }))
             }
-            placeholder="A65 F4E2"
+            placeholder={t('addresses.eircodePlaceholder')}
             required
             autoComplete="postal-code"
           />
 
           <LocationSelect
             variant="field"
-            label="Delivery location"
+            label={t('addresses.deliveryLocation')}
             value={draft.area_name}
             options={areaOptions}
             onChange={(value) =>
@@ -298,7 +318,9 @@ export function CustomerAddressesPage() {
             }
             required
             placeholder={
-              areaOptions.length ? 'Select location' : 'No locations configured'
+              areaOptions.length
+                ? t('addresses.selectLocation')
+                : t('addresses.noLocations')
             }
             disabled={areaOptions.length === 0}
           />
@@ -312,7 +334,7 @@ export function CustomerAddressesPage() {
                 setDraft((d) => ({ ...d, isDefault: e.target.checked }))
               }
             />
-            Set as default address
+            {t('addresses.setDefault')}
           </label>
 
           <div className="flex flex-wrap gap-2 pt-1">
@@ -321,7 +343,7 @@ export function CustomerAddressesPage() {
               className="hb-btn hb-btn-primary h-9 px-4 text-sm"
               disabled={saving || areaOptions.length === 0}
             >
-              {saving ? 'Saving…' : 'Save address'}
+              {saving ? t('addresses.saving') : t('addresses.save')}
             </button>
             <button
               type="button"
@@ -329,7 +351,7 @@ export function CustomerAddressesPage() {
               onClick={cancelEdit}
               disabled={saving}
             >
-              Cancel
+              {t('addresses.cancel')}
             </button>
           </div>
         </form>
@@ -338,7 +360,7 @@ export function CustomerAddressesPage() {
       {list.length === 0 && !editing ? (
         <div className="hb-surface px-5 py-6 shadow-sm">
           <p className="text-sm text-[var(--hb-ink)]/70">
-            No saved addresses yet. Add one so checkout can use your default.
+            {t('addresses.empty')}
           </p>
         </div>
       ) : list.length > 0 ? (
@@ -346,18 +368,20 @@ export function CustomerAddressesPage() {
           <table className="hb-data-table">
             <thead>
               <tr>
-                <th>Label</th>
-                <th>Address</th>
-                <th>Eircode</th>
-                <th>Location</th>
-                <th>Default</th>
-                <th style={{ textAlign: 'right' }}>Actions</th>
+                <th>{t('addresses.col.label')}</th>
+                <th>{t('addresses.col.address')}</th>
+                <th>{t('addresses.col.eircode')}</th>
+                <th>{t('addresses.col.location')}</th>
+                <th>{t('addresses.col.default')}</th>
+                <th style={{ textAlign: 'right' }}>
+                  {t('addresses.col.actions')}
+                </th>
               </tr>
             </thead>
             <tbody>
               {list.map((a) => (
                 <tr key={a.id}>
-                  <td className="font-semibold">{a.label}</td>
+                  <td className="font-semibold">{displayLabel(a.label)}</td>
                   <td>{a.line1}</td>
                   <td className="whitespace-nowrap">{a.eircode}</td>
                   <td>{a.area_name}</td>
@@ -371,24 +395,24 @@ export function CustomerAddressesPage() {
                         onChange={() => {
                           if (!a.isDefault) void setDefault(a.id);
                         }}
-                        aria-label={`Set ${a.label} as default address`}
+                        aria-label={`${t('addresses.setDefault')} (${displayLabel(a.label)})`}
                       />
-                      <span className="sr-only">Default</span>
+                      <span className="sr-only">{t('addresses.col.default')}</span>
                     </label>
                   </td>
                   <td>
                     <div className="hb-data-table__actions">
                       <IconButton
-                        label={`Edit ${a.label} address`}
-                        tooltip="Edit"
+                        label={`${t('addresses.edit')} ${displayLabel(a.label)}`}
+                        tooltip={t('addresses.edit')}
                         disabled={saving || editing}
                         onClick={() => startEdit(a)}
                       >
                         {UtilityIcons.edit({ size: ICON_SIZES.sm })}
                       </IconButton>
                       <IconButton
-                        label={`Remove ${a.label} address`}
-                        tooltip="Remove"
+                        label={`${t('addresses.remove')} ${displayLabel(a.label)}`}
+                        tooltip={t('addresses.remove')}
                         tone="danger"
                         disabled={saving}
                         onClick={() => void remove(a.id)}

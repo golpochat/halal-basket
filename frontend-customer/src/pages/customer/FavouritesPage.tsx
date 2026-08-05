@@ -11,6 +11,7 @@ import {
   useCatalogueStore,
   usePlatformCatalogueQuery,
   useToastStore,
+  localizeProductName,
 } from '@halal-basket/web';
 import { useAuth } from '../../auth/AuthContext';
 import { useLocale } from '../../locale/LocaleContext';
@@ -38,7 +39,7 @@ type CatalogueRow = {
 export function CustomerFavouritesPage() {
   const { session } = useAuth();
   const token = session!.accessToken;
-  const { formatMoney } = useLocale();
+  const { formatMoney, formatNumber, t, languageCode } = useLocale();
   const toast = useToastStore((s) => s.toast);
   const area = useCatalogueStore((s) => s.area);
   const lines = useCartStore((s) => s.lines);
@@ -80,14 +81,17 @@ export function CustomerFavouritesPage() {
     };
   }, [token, fav.ids]);
 
+  const areaSuffix = area
+    ? t('favourites.areaSuffix', { area })
+    : '';
+
   return (
     <>
       <h1 className="font-display text-3xl font-semibold tracking-tight">
-        Favourites
+        {t('favourites.title')}
       </h1>
       <p className="mt-2 text-sm text-[var(--hb-ink)]/60">
-        Saved products for quick add. Prices and stock follow your selected
-        delivery area{area ? ` (${area})` : ''}.
+        {t('favourites.subtitle', { areaSuffix })}
       </p>
 
       <div className="mt-6">
@@ -95,13 +99,13 @@ export function CustomerFavouritesPage() {
           <p className="text-sm text-[var(--hb-danger,#b42318)]">{error}</p>
         ) : null}
         {loading ? (
-          <p className="text-sm text-[var(--hb-ink)]/55">Loading…</p>
+          <p className="text-sm text-[var(--hb-ink)]/55">{t('favourites.loading')}</p>
         ) : null}
 
         {!loading && rows.length === 0 ? (
           <EmptyState
-            title="No favourites yet"
-            description="Tap the heart on a product in the shop to save it here."
+            title={t('favourites.emptyTitle')}
+            description={t('favourites.emptyDesc')}
           />
         ) : null}
 
@@ -127,15 +131,28 @@ export function CustomerFavouritesPage() {
                     price: live ? price : 0,
                     imageUrl: row.product.imageUrl,
                     stock,
-                    verifiedHalal: true,
-                    shopPartner: true,
                   }}
+                  displayName={localizeProductName(
+                    row.product.name,
+                    languageCode,
+                  )}
                   qty={qty}
                   formatMoney={formatMoney}
+                  formatQty={formatNumber}
+                  labels={{
+                    add: t('product.add'),
+                    inStock: t('product.inStock'),
+                    lowStock: t('product.lowStock'),
+                    outOfStock: t('product.outOfStock'),
+                    saveFavourite: t('product.saveFavourite'),
+                    removeFavourite: t('product.removeFavourite'),
+                    decreaseAria: t('product.decreaseAria'),
+                    increaseAria: t('product.increaseAria'),
+                  }}
                   favourited
                   onToggleFavourite={() => {
                     void fav.toggle(row.productId).then(
-                      () => toastSuccess('Removed from favourites'),
+                      () => toastSuccess(t('favourites.removed')),
                       (err: Error) => toastError(err.message),
                     );
                   }}
@@ -143,8 +160,8 @@ export function CustomerFavouritesPage() {
                     if (!live) {
                       toastError(
                         area
-                          ? 'Not available in your area right now'
-                          : 'Select a delivery area on the shop to see price',
+                          ? t('favourites.notInArea')
+                          : t('favourites.selectArea'),
                       );
                       return;
                     }
@@ -154,7 +171,14 @@ export function CustomerFavouritesPage() {
                       price,
                       imageUrl: row.product.imageUrl,
                     });
-                    toast(`Added ${row.product.name}`);
+                    toast(
+                      t('favourites.added', {
+                        name: localizeProductName(
+                          row.product.name,
+                          languageCode,
+                        ),
+                      }),
+                    );
                   }}
                   onDec={() => {
                     if (qty <= 1) setQty(row.productId, 0);
@@ -168,7 +192,7 @@ export function CustomerFavouritesPage() {
 
         <p className="mt-6 text-sm">
           <Link to="/" className="text-[var(--hb-green)] hover:underline">
-            Continue shopping →
+            {t('favourites.continueShopping')}
           </Link>
         </p>
       </div>

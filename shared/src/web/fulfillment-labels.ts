@@ -1,16 +1,7 @@
-import type { FulfillmentMode, FulfillmentStatus } from '../types';
+import type { FulfillmentStatus } from '../types';
+import { t } from './i18n';
 
 export type StatusTone = 'green' | 'gold' | 'muted' | 'danger' | 'warning';
-
-const STATUS_LABELS: Record<FulfillmentStatus, string> = {
-  pending: 'Pending',
-  preparing: 'Preparing',
-  ready: 'Ready',
-  out_for_delivery: 'Out for delivery',
-  delivered: 'Delivered',
-  failed_attempt: 'Attempt failed',
-  cancelled: 'Cancelled',
-};
 
 const STATUS_TONES: Record<FulfillmentStatus, StatusTone> = {
   pending: 'muted',
@@ -22,11 +13,31 @@ const STATUS_TONES: Record<FulfillmentStatus, StatusTone> = {
   cancelled: 'danger',
 };
 
-const MODE_LABELS: Record<FulfillmentMode, string> = {
-  pickup: 'Pickup',
-  scheduled_delivery: 'Scheduled delivery',
-  realtime_delivery: 'Realtime delivery',
-};
+const FULFILLMENT_STATUSES = new Set<string>([
+  'pending',
+  'preparing',
+  'ready',
+  'out_for_delivery',
+  'delivered',
+  'failed_attempt',
+  'cancelled',
+]);
+
+const FULFILLMENT_MODES = new Set<string>([
+  'pickup',
+  'scheduled_delivery',
+  'realtime_delivery',
+]);
+
+const PAYMENT_STATUSES = new Set(['pending', 'paid', 'failed', 'refunded']);
+
+const ORDER_STATUSES = new Set([
+  'pending',
+  'confirmed',
+  'in_progress',
+  'completed',
+  'cancelled',
+]);
 
 function titleCaseWords(raw: string): string {
   return raw
@@ -37,9 +48,19 @@ function titleCaseWords(raw: string): string {
     .join(' ');
 }
 
-export function formatFulfillmentStatus(status: string): string {
-  if (status in STATUS_LABELS) {
-    return STATUS_LABELS[status as FulfillmentStatus];
+/** Prefer explicit lang; otherwise `document.documentElement.lang` from LocaleContext. */
+function resolveLang(lang?: string): string {
+  if (lang) return lang;
+  if (typeof document !== 'undefined' && document.documentElement.lang) {
+    return document.documentElement.lang;
+  }
+  return 'en';
+}
+
+export function formatFulfillmentStatus(status: string, lang?: string): string {
+  const code = resolveLang(lang);
+  if (FULFILLMENT_STATUSES.has(status)) {
+    return t(`fulfillment.status.${status}`, code);
   }
   return titleCaseWords(status);
 }
@@ -51,32 +72,26 @@ export function fulfillmentStatusTone(status: string): StatusTone {
   return 'muted';
 }
 
-export function formatFulfillmentMode(mode: string): string {
-  if (mode in MODE_LABELS) {
-    return MODE_LABELS[mode as FulfillmentMode];
+export function formatFulfillmentMode(mode: string, lang?: string): string {
+  const code = resolveLang(lang);
+  if (FULFILLMENT_MODES.has(mode)) {
+    return t(`fulfillment.mode.${mode}`, code);
   }
   return titleCaseWords(mode);
 }
 
-const PAYMENT_LABELS: Record<string, string> = {
-  pending: 'Pending',
-  paid: 'Paid',
-  failed: 'Failed',
-  refunded: 'Refunded',
-};
-
-const ORDER_STATUS_LABELS: Record<string, string> = {
-  pending: 'Pending',
-  confirmed: 'Confirmed',
-  in_progress: 'In progress',
-  completed: 'Completed',
-  cancelled: 'Cancelled',
-};
-
-export function formatPaymentStatus(status: string): string {
-  return PAYMENT_LABELS[status] ?? titleCaseWords(status);
+export function formatPaymentStatus(status: string, lang?: string): string {
+  const code = resolveLang(lang);
+  if (PAYMENT_STATUSES.has(status)) {
+    return t(`payment.status.${status}`, code);
+  }
+  return titleCaseWords(status);
 }
 
-export function formatOrderStatus(status: string): string {
-  return ORDER_STATUS_LABELS[status] ?? titleCaseWords(status);
+export function formatOrderStatus(status: string, lang?: string): string {
+  const code = resolveLang(lang);
+  if (ORDER_STATUSES.has(status)) {
+    return t(`order.status.${status}`, code);
+  }
+  return titleCaseWords(status);
 }

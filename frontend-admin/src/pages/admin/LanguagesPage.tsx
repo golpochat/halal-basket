@@ -73,9 +73,10 @@ function LanguagesInner() {
         <section className="hb-surface mb-8 p-5 shadow-sm">
           <h2 className="font-display text-xl font-semibold">Languages</h2>
           <p className="mt-1 text-sm text-[var(--hb-ink)]/55">
-            Manage language records and the default language. Customer, shop, and
-            driver language selection remains unavailable until translated UI
-            content is implemented.
+            Publish a language to show it in customer and shop pickers (English,
+            Bangla, Hindi, Urdu, Arabic packs are ready). Unpublish to hide it.
+            Admin and driver apps stay English. Default language cannot be
+            unpublished or deleted.
           </p>
           <ul className="mt-4 space-y-2">
             {languages.map((l) => (

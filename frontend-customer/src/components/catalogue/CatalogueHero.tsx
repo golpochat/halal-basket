@@ -7,13 +7,30 @@ import {
   useBrandingQuery,
 } from '@halal-basket/web';
 import { api } from '../../lib/api';
+import { useLocale } from '../../locale/LocaleContext';
 
 const DEFAULT_BG =
   'url("https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=1600&q=80") center/cover';
 
-function formatDay(raw: string) {
+const DAY_KEYS = [
+  'monday',
+  'tuesday',
+  'wednesday',
+  'thursday',
+  'friday',
+  'saturday',
+  'sunday',
+] as const;
+
+function translateDay(
+  raw: string,
+  t: (key: string) => string,
+): string {
   const d = raw.trim().toLowerCase();
   if (!d) return '';
+  if ((DAY_KEYS as readonly string[]).includes(d)) {
+    return t(`day.${d}`);
+  }
   return d.charAt(0).toUpperCase() + d.slice(1);
 }
 
@@ -23,17 +40,22 @@ export function CatalogueHero({
   /** Comma-separated delivery days for the selected catalogue area. */
   selectedAreaDays: string | null;
 }) {
+  const { t, languageCode } = useLocale();
   const search = useCatalogueStore((s) => s.search);
   const setSearch = useCatalogueStore((s) => s.setSearch);
   const area = useCatalogueStore((s) => s.area);
   const branding = useBrandingQuery(api);
   const bgUrl = branding.data?.heroBackgroundUrl;
+
+  // CMS branding copy is English; use packs for other languages.
   const heroTitle =
-    branding.data?.heroTitle?.trim() ||
-    'Halal groceries delivered or ready for pickup';
+    languageCode === 'en' && branding.data?.heroTitle?.trim()
+      ? branding.data.heroTitle.trim()
+      : t('catalogue.heroTitle');
   const heroSubtitle =
-    branding.data?.heroSubtitle?.trim() ||
-    'From trusted local halal shops in Dublin';
+    languageCode === 'en' && branding.data?.heroSubtitle?.trim()
+      ? branding.data.heroSubtitle.trim()
+      : t('catalogue.heroSubtitle');
 
   const background = bgUrl
     ? `url("${bgUrl}") center/cover`
@@ -42,7 +64,7 @@ export function CatalogueHero({
   const daysLabel = selectedAreaDays
     ? selectedAreaDays
         .split(',')
-        .map((d) => formatDay(d))
+        .map((d) => translateDay(d, t))
         .filter(Boolean)
         .join(' · ')
     : '';
@@ -68,13 +90,13 @@ export function CatalogueHero({
 
         <div className="mt-8 w-full max-w-3xl">
           <label className="sr-only" htmlFor="hero-search">
-            Search products
+            {t('catalogue.heroSearchAria')}
           </label>
           <SearchInput
             id="hero-search"
             size="lg"
             className="shadow-[var(--hb-shadow-lg)]"
-            placeholder="Search rice, chicken, oil…"
+            placeholder={t('catalogue.heroSearchPlaceholder')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             autoComplete="off"
@@ -92,29 +114,27 @@ export function CatalogueHero({
               </span>
               <div className="min-w-0 flex-1">
                 <p className="text-sm text-white/95">
-                  <strong className="font-semibold">{area}</strong>
-                  <span className="text-white/80"> — delivery </span>
-                  <strong className="font-semibold">{daysLabel}</strong>
+                  {t('catalogue.deliveryLine', { area, days: daysLabel })}
                 </p>
                 <p className="mt-0.5 text-xs text-white/70">
-                  Change area from the header pin, or browse all schedules.
+                  {t('catalogue.deliveryHint')}
                 </p>
               </div>
               <Link
                 to="/delivery-locations"
                 className="hb-calendar-strip__cta shrink-0"
               >
-                All areas &amp; days
+                {t('catalogue.allAreasDays')}
               </Link>
             </div>
           ) : (
             <p className="text-sm text-white/85">
-              Choose your area in the header to see your delivery day.{' '}
+              {t('catalogue.chooseArea')}{' '}
               <Link
                 to="/delivery-locations"
                 className="hb-calendar-strip__cta hb-calendar-strip__cta--inline"
               >
-                All areas &amp; days
+                {t('catalogue.allAreasDays')}
               </Link>
             </p>
           )}

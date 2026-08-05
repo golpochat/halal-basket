@@ -8,6 +8,7 @@ import { PaymentStatus } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../../common/audit.service';
+import { WhatsappService } from '../whatsapp/whatsapp.service';
 
 @Injectable()
 export class PaymentsService {
@@ -15,6 +16,7 @@ export class PaymentsService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly audit: AuditService,
+    private readonly whatsapp: WhatsappService,
   ) {}
 
   provider(): 'mock' | 'stripe' {
@@ -218,6 +220,11 @@ export class PaymentsService {
       entityId: orderId,
       payload: meta,
     });
+
+    this.whatsapp.notifySafe(
+      () => this.whatsapp.notifyPaymentReceived(orderId),
+      `payment_received ${orderId}`,
+    );
 
     return updated;
   }

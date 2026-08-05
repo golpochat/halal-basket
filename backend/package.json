@@ -13,6 +13,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "prisma db seed",
+    "products:write-cultural-csv": "node prisma/export-products-csv.cjs",
     "e2e": "node -r ts-node/register/transpile-only scripts/e2e-smoke.ts"
   },
   "dependencies": {

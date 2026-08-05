@@ -40,9 +40,11 @@ export function EmptyState({
 export function ErrorState({
   message,
   onRetry,
+  retryLabel = 'Try again',
 }: {
   message: string;
   onRetry?: () => void;
+  retryLabel?: string;
 }) {
   return (
     <div
@@ -56,7 +58,7 @@ export function ErrorState({
           className="mt-4 inline-flex rounded-[var(--hb-radius)] border border-[rgba(26,92,58,0.25)] px-4 py-2 text-sm font-semibold text-[var(--hb-green)] hover:bg-[var(--hb-mist)]"
           onClick={onRetry}
         >
-          Try again
+          {retryLabel}
         </button>
       )}
     </div>

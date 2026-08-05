@@ -7,9 +7,10 @@ import {
   ProductCardSkeleton,
   ProductGrid,
   UtilityIcons,
-  collectMatchNames,
+  categoryDisplayName,
   deriveStockLevel,
   findCategoryNode,
+  productMatchesBrowseNode,
   useCartStore,
   useCatalogueStore,
   useDeliveryCalendarQuery,
@@ -17,6 +18,7 @@ import {
   useToastStore,
   toastError,
   toastSuccess,
+  localizeProductName,
 } from '@halal-basket/web';
 import { AppHeader } from '../../components/layout/AppHeader';
 import { AppFooter } from '../../components/layout/AppFooter';
@@ -30,11 +32,13 @@ import { FiltersPanel } from '../../components/catalogue/FiltersPanel';
 import { useLocale } from '../../locale/LocaleContext';
 import { api } from '../../lib/api';
 import { useFavourites } from '../../hooks/useFavourites';
+import { useWhatsappAssistHandoff } from '../../hooks/useWhatsappAssistHandoff';
 
 export function CataloguePage() {
-  const { formatMoney } = useLocale();
+  const { formatMoney, formatNumber, t, languageCode } = useLocale();
   const toast = useToastStore((s) => s.toast);
   const fav = useFavourites();
+  useWhatsappAssistHandoff();
 
   const search = useCatalogueStore((s) => s.search);
   const browsePath = useCatalogueStore((s) => s.browsePath);
@@ -104,8 +108,11 @@ export function CataloguePage() {
     return browsePath
       .map((id) => findCategoryNode(id))
       .filter(Boolean)
-      .map((n) => ({ id: n!.id, name: n!.name }));
-  }, [browsePath]);
+      .map((n) => ({
+        id: n!.id,
+        name: categoryDisplayName(n!, languageCode),
+      }));
+  }, [browsePath, languageCode]);
 
   useEffect(() => {
     if (areas[0] && !area) setArea(areas[0]);
@@ -113,12 +120,18 @@ export function CataloguePage() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const matchNames = currentNode ? collectMatchNames(currentNode) : null;
 
     let list = products.filter((p) => {
-      if (matchNames && !q) {
-        const catName = p.product.category?.name ?? '';
-        if (!matchNames.includes(catName)) return false;
+      if (currentId && !q) {
+        if (
+          !productMatchesBrowseNode(
+            p.product.name,
+            p.product.category?.name,
+            currentId,
+          )
+        ) {
+          return false;
+        }
       }
       const price = Number(p.discountPrice ?? p.price);
       if (filters.priceMin != null && price < filters.priceMin) return false;
@@ -148,7 +161,7 @@ export function CataloguePage() {
     });
 
     return list;
-  }, [products, search, currentNode, filters, sortBy]);
+  }, [products, search, currentId, filters, sortBy]);
 
   function handleAdd(p: (typeof products)[0]) {
     const price = Number(p.discountPrice ?? p.price);
@@ -159,8 +172,23 @@ export function CataloguePage() {
       imageUrl: p.product.imageUrl,
     });
     pushRecent(p.productId);
-    toast(`Added ${p.product.name}`);
+    toast(
+      t('favourites.added', {
+        name: localizeProductName(p.product.name, languageCode),
+      }),
+    );
   }
+
+  const productLabels = {
+    add: t('product.add'),
+    inStock: t('product.inStock'),
+    lowStock: t('product.lowStock'),
+    outOfStock: t('product.outOfStock'),
+    saveFavourite: t('product.saveFavourite'),
+    removeFavourite: t('product.removeFavourite'),
+    decreaseAria: t('product.decreaseAria'),
+    increaseAria: t('product.increaseAria'),
+  };
 
   const loading =
     calendarQuery.isLoading ||
@@ -188,11 +216,12 @@ export function CataloguePage() {
           price,
           imageUrl: p.product.imageUrl,
           stock: deriveStockLevel(p.isInStock),
-          verifiedHalal: true,
-          shopPartner: true,
         }}
+        displayName={localizeProductName(p.product.name, languageCode)}
         qty={qty}
         formatMoney={formatMoney}
+        formatQty={formatNumber}
+        labels={productLabels}
         onAdd={() => handleAdd(p)}
         onDec={() => setQty(p.productId, qty - 1)}
         favourited={fav.enabled ? fav.isFavourite(p.productId) : undefined}
@@ -204,8 +233,8 @@ export function CataloguePage() {
                   () =>
                     toastSuccess(
                       was
-                        ? 'Removed from favourites'
-                        : 'Saved to favourites',
+                        ? t('favourites.removed')
+                        : t('favourites.saved'),
                     ),
                   (err: Error) => toastError(err.message),
                 );
@@ -240,7 +269,7 @@ export function CataloguePage() {
                 onClick={() => setFiltersOpen(true)}
               >
                 {UtilityIcons.filters({ size: 18 })}
-                Filters
+                {t('catalogue.filters')}
               </Button>
             </div>
           )}
@@ -253,14 +282,14 @@ export function CataloguePage() {
             {!isHome && (
               <nav
                 className="mb-4 flex flex-wrap items-center gap-1 text-sm text-[var(--hb-ink)]/55"
-                aria-label="Breadcrumb"
+                aria-label={t('catalogue.breadcrumb')}
               >
                 <button
                   type="button"
                   className="font-medium text-[var(--hb-green)] hover:underline"
                   onClick={() => goHome()}
                 >
-                  Home
+                  {t('catalogue.home')}
                 </button>
                 {breadcrumbs.map((b, i) => (
                   <span key={b.id} className="inline-flex items-center gap-1">
@@ -284,7 +313,9 @@ export function CataloguePage() {
             {showSubcategories && (
               <section>
                 <h2 className="mb-4 font-display text-xl font-semibold sm:text-2xl">
-                  {currentNode?.name}
+                  {currentNode
+                    ? categoryDisplayName(currentNode, languageCode)
+                    : null}
                 </h2>
                 <SubcategoryGrid
                   nodes={childNodes}
@@ -298,8 +329,10 @@ export function CataloguePage() {
                 <div className="mb-5">
                   <h2 className="font-display text-xl font-semibold sm:text-2xl">
                     {search.trim()
-                      ? 'Search results'
-                      : (currentNode?.name ?? 'Products')}
+                      ? t('catalogue.searchResults')
+                      : currentNode
+                        ? categoryDisplayName(currentNode, languageCode)
+                        : t('catalogue.products')}
                   </h2>
                   <p className="mt-1 text-sm text-[var(--hb-ink)]/55">
                     Halal Basket
@@ -317,9 +350,10 @@ export function CataloguePage() {
                       message={
                         error instanceof Error
                           ? error.message
-                          : 'Unable to load products. Try again.'
+                          : t('catalogue.loadError')
                       }
                       onRetry={retry}
+                      retryLabel={t('catalogue.tryAgain')}
                     />
                   </div>
                 )}
@@ -334,8 +368,8 @@ export function CataloguePage() {
 
                 {!loading && !error && filtered.length === 0 && (
                   <EmptyState
-                    title="No products found."
-                    description="Try another category, filter, area, or search term."
+                    title={t('catalogue.emptyTitle')}
+                    description={t('catalogue.emptyDesc')}
                   />
                 )}
 
